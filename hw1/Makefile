@@ -5,5 +5,9 @@ main: main.o
 main.o: main.cpp
 	g++ -c main.cpp
 
-test: test.cpp
-	g++ test.cpp -o test
+report1:
+	ping 10.0.141.91 -c 3
+
+report2: client.py
+	ping 10.0.141.91 -c 1
+	python3 client.py

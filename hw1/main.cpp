@@ -10,18 +10,20 @@
 
 using namespace std;
 
-char opt_sh[] = "i:c:f:";
+char opt_sh[] = "i:c:f:p:";
 option opt_long[] = {
     {"interface", required_argument, NULL, 'i'},
     {"count", required_argument, NULL, 'c'},
-    {"filter", required_argument, NULL, 'f'}
+    {"filter", required_argument, NULL, 'f'},
+    {"port", required_argument, NULL, 'p'}
 };
 
 enum proto {ICMP, TCP, UDP};
 
-void process_args(int argc,  char *const argv[], char* Interface, int &Count, char* Filter) {
+void process_args(int argc,  char *const argv[], char* Interface, int &Count, char* Filter, int &Port) {
     // init
     Count = -1;
+    Port = -1;
     memset(Interface, 0, 256);
     memset(Filter, 0, 10);
 
@@ -42,6 +44,10 @@ void process_args(int argc,  char *const argv[], char* Interface, int &Count, ch
             break;
         case 'f':
             strcpy(Filter, optarg);
+            break;
+        case 'p':
+            Port = atoi(optarg);
+            break;
         }
     }
 }
@@ -68,13 +74,12 @@ int main(int argc, char* const argv[])
         // cout<<"Name: "<<d->name<<endl;
     }
     
-    int         Count;
+    int         Count, Port;
     char        Interface[256]; // pcap_if_t
     char        Filter[50];
-    process_args(argc, argv, Interface, Count, Filter);
+    process_args(argc, argv, Interface, Count, Filter, Port);
     if (strlen(Interface) == 0) strcpy(Interface, vec[0]->name);
-    if (strlen(Filter) == 0 || strcmp(Filter, "all") == 0) strcpy(Filter, "udp or tcp or icmp");
-    // printf("Filter: %s@@\n", Filter)
+    if (strlen(Filter) == 0 || strcmp(Filter, "all") == 0) strcpy(Filter, "udp || tcp || icmp");
     
     bpf_program fp; // for filter, compiled in "pcap_compile"
     pcap_t *handle;
@@ -104,8 +109,6 @@ int main(int argc, char* const argv[])
         const unsigned char* packet = pcap_next(handle, &header);
         if (packet == NULL) break;
         
-        // printf("packet length: %d\n", header.caplen);
-        
         // ethernet header
         packet += 14;
 
@@ -114,7 +117,7 @@ int main(int argc, char* const argv[])
         // get ip version
         int version = packet[0] >> 4;
         proto pro;
-        long long int payload_length = 0;
+        int payload_length = 0;
 
         switch (version) {
         case 4:
@@ -137,7 +140,7 @@ int main(int argc, char* const argv[])
             else if (ip_h.protocol == 17) pro = UDP;
             else if (ip_h.protocol == 1) pro = ICMP;
             // get payload length
-            payload_length = ip_h.tot_len - (ip_h.ihl << 2);
+            payload_length = ntohs((int)ip_h.tot_len) - (ip_h.ihl << 2);
 
             packet += (ip_h.ihl << 2);
             break;
@@ -173,46 +176,55 @@ int main(int argc, char* const argv[])
             break;
         }
 
-        switch (pro) {
-            case ICMP: 
-                printf("Transport type: ICMP\n");
-                printf("Source IP: %s\n", src);
-                printf("Destination IP: %s\n", dst);
-                printf("ICMP type value: %d\n", (int)packet[0]);
-                break;
-            case TCP:
-                tcphdr tcp_hdr;
-                memcpy(&tcp_hdr, packet, sizeof(tcphdr));
+        bool find_port = true;
+        if (pro == ICMP) {
+            printf("Transport type: ICMP\n");
+            printf("Source IP: %s\n", src);
+            printf("Destination IP: %s\n", dst);
+            printf("ICMP type value: %d\n", (int)packet[0]);
+        }else {
+            int src_port, dst_port, tmp;
+            memcpy(&tmp, packet, 2);
+            src_port = ntohs(tmp);
+            memcpy(&tmp, packet+2, 2);
+            dst_port = ntohs(tmp);
+            if (!(Port == -1 || Port == src_port || Port == dst_port)) continue;
+
+            if (pro == TCP) {
                 printf("Transport type: TCP\n");
                 printf("Source IP: %s\n", src);
                 printf("Destination IP: %s\n", dst);
-                printf("Source port: %d\n", tcp_hdr.source);
-                printf("Destination port: %d\n", tcp_hdr.dest);
-                payload_length -= tcp_hdr.doff;
-                if (payload_length <= 0) break;
-                packet += tcp_hdr.doff;
+                printf("Source port: %d\n", src_port);
+                printf("Destination port: %d\n", dst_port);
+
+                tcphdr hdr;
+                memcpy(&hdr, packet, sizeof(tcphdr));
+                int hdr_len = hdr.doff << 2;
+
+                payload_length -= hdr_len;
+                packet += hdr_len;
+
                 printf("Payload:");
-                for (int i = 0; i < min(16, (int)payload_length); i++) printf(" %X", packet[i]);
+                if (payload_length > 0) 
+                    for (int i = 0; i < min(16, (int)payload_length); i++) 
+                        printf(" %X", (int)packet[i]);
                 printf("\n");
-                break;
-            case UDP:
-                udphdr udp_hdr;
-                memcpy(&udp_hdr, packet, sizeof(udphdr));
+            } else if (pro == UDP) {
                 printf("Transport type: UDP\n");
                 printf("Source IP: %s\n", src);
                 printf("Destination IP: %s\n", dst);
-                printf("Source port: %d\n", udp_hdr.source);
-                printf("Destination port: %d\n", udp_hdr.dest);
-                printf("Payload:");
+                printf("Source port: %d\n", src_port);
+                printf("Destination port: %d\n", dst_port);
                 payload_length -= 8;
-                if (payload_length > 0) {
-                    packet += 8;
-                    for (int i = 0; i < min(16, (int)payload_length); i++) printf(" %X", packet[i]);
-                }
+
+                packet += 8;
+                printf("Payload:");
+                if (payload_length > 0) 
+                    for (int i = 0; i < min(16, (int)payload_length); i++) 
+                        printf(" %X", (int)packet[i]);
                 printf("\n");
-                break;
+            }
         }
-        
         if (Count != -1) Count --;
         printf("\n");
     }
