@@ -170,8 +170,11 @@ int main(int argc, char* const argv[])
                 if (nxt == 6) pro = TCP;
                 else if (nxt == 17) pro = UDP;
                 else if (nxt == 58) pro = ICMP;
-                
-                nxt = packet[0];
+                else {
+                    nxt = packet[0];
+                    continue;
+                }
+                break;
             }
             break;
         }

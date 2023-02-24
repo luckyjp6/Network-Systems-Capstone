@@ -9,3 +9,4 @@ A C++ program that captures live network packets and prints some information in 
 (default = -1 -> this program will continuously capture packets until it is interrupted.)
 - --filter {udp, tcp, icmp, all}, -f {udp, tcp, icmp, all}  
 (default = all -> It should correctly filter out UDP, TCP, and ICMP packets.)
+- --port {src or dst port number}, -p {port number}
