@@ -11,8 +11,11 @@ class host:
         self.port_to = node
     def show_table(self):
         # display ARP table entries for this host
+        for ip, mac in self.arp_table.items():
+            print("{}:{}".format(ip, mac))
     def clear(self):
         # clear ARP table entries for this host
+        self.arp_table.clear()
     def update_arp(self, ...):
         # update ARP table with a new entry
     def handle_packet(self, ...): # handle incoming packets
@@ -31,10 +34,14 @@ class switch:
         self.port_to = list() 
     def add(self, node): # link with other hosts or switches
         self.port_to.append(node)
+        self.port_n += 1
     def show_table(self):
         # display MAC table entries for this switch
+        for mac, port in self.mac_table:
+            print("{}:{}".format(mac, port))
     def clear(self):
         # clear MAC table entries for this switch
+        self.mac_table.clear()
     def update_mac(self, ...):
         # update MAC table with a new entry
     def send(self, idx, ...): # send to the specified port
@@ -45,13 +52,16 @@ class switch:
 
 
 def add_link(tmp1, tmp2): # create a link between two nodes
-    # ...
+    if (tmp1 in host_dict.keys()): host_dict[tmp1].add(tmp2)
+    else: switch_dict[tmp1].add(tmp2)
+    if (tmp2 in host_dict.keys()): host_dict[tmp2].add(tmp1)
+    else: switch_dict[tmp2].add(tmp1)
 
 def set_topology():
     global host_dict, switch_dict
     hostlist = get_hosts().split(' ')
     switchlist = get_switches().split(' ')
-    link_command = get_links()
+    link_command = get_links().split(' ')
     ip_dic = get_ip()
     mac_dic = get_mac()
     
@@ -59,6 +69,14 @@ def set_topology():
     switch_dict = dict() # maps switch names to switch objects
     
     # ... create nodes and links
+    for name in hostlist:
+        host_dict[name] = host(name, ip_dic[name], mac_dic[name])
+    for name in switchlist:
+        switch_dict[name] = switch(name, 0)
+    for link in link_command:
+        add_link(link)
+
+
 
 def ping(tmp1, tmp2): # initiate a ping between two hosts
     global host_dict, switch_dict
@@ -71,7 +89,9 @@ def ping(tmp1, tmp2): # initiate a ping between two hosts
 
 
 def show_table(tmp): # display the ARP or MAC table of a node
-    # ...
+    for item in tmp:
+        print("---------------{}:".format(item.name))
+        item.show_table()
 
 
 def clear():
