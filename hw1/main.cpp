@@ -179,7 +179,6 @@ int main(int argc, char* const argv[])
             break;
         }
 
-        bool find_port = true;
         if (pro == ICMP) {
             printf("Transport type: ICMP\n");
             printf("Source IP: %s\n", src);
