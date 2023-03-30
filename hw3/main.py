@@ -11,3 +11,6 @@ print(slotted_aloha_rates)
 
 csma_rates = csma(setting, True)
 print(csma_rates)
+
+csma_cd_rates = csma_cd(setting, True)
+print(csma_cd_rates)
