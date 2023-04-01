@@ -24,7 +24,7 @@ for h,p in zip(host_num_list, packet_num_list):
     rates[0].append(aloha(setting, False))
     rates[1].append(slotted_aloha(setting, False))
     rates[2].append(csma(setting, False))
-    rates[3].append(csma_cd(setting, True))
+    rates[3].append(csma_cd(setting, False))
 for i in range(4):
     rates[i] = [[item[j] for item in rates[i]] for j in range(len(rates[i][0]))]
 # print(rates)

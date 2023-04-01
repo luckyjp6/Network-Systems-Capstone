@@ -26,8 +26,9 @@ class my_host():
         if self.backoff > 0: self.backoff -=1 # update backoff
         if send_rate == -1: return # for slotted_aloha, check if at the start of a slot
         if self.check_send(time): # check if there's any packet ready to be sent
-            if (random.uniform(0,1) < send_rate) and self.retransmit: # for slotted_aloha, retransmit for prob. p
-                self.action = "s" 
+            if send_rate > 0: # for slotted_aloha, retransmit for prob. p
+                if not self.retransmit: self.action = "s"
+                elif random.uniform(0,1) < send_rate: self.action = "s"
                 return
             if self.backoff > 0: return # backoff -> do not send packet
             if num_send == 1 and self.is_me > 0: 
@@ -46,10 +47,10 @@ class my_host():
     def get_state(self, time, num_send=0, send_rate=0, cd=False):
         if self.is_me > 0: self.is_me -= 1 # update is_me
         if self.action == ".": self.do_idle(time, num_send, send_rate)
-        elif self.action == "|":
+        elif self.action == "|" or self.action == "a":
             self.action = "."
             self.do_idle(time, num_send, send_rate)
-        elif self.action == "s" or self.action == "a":
+        elif self.action == "s":
             if cd and (num_send > 1): 
                 self.do_collision() # for csma/cd
                 return
@@ -68,7 +69,6 @@ class my_host():
                 self.num_packet_sent += 1
                 self.retransmit = False
                 self.history += ">"
-                self.action = "."
                 if delay > 0: self.is_me = delay+1+1
             else: 
                 self.history += "|"
@@ -84,11 +84,12 @@ class my_host():
 
 def check_collision(hosts):
     num = 0
+    num_ack = 0
     for host in hosts:
-        if host.action == "s" or host.action == "|": 
-            num += 1
-        if num > 1: return num        
-    return num
+        if host.action == "s" or host.action == "|": num += 1
+        if host.action == "a": num_ack += 1
+        if num > 1: return num, num_ack
+    return num, num_ack
 
 def aloha(setting, show_history=False):
     packets = setting.gen_packets()
@@ -104,17 +105,20 @@ def aloha(setting, show_history=False):
             host.get_state(t)
         
         # Hosts that decide to send send packets.
-        num_send.append(check_collision(hosts))
+        num, ack = check_collision(hosts)
+        num_send.append(num + ack)
 
-        # Check collision if two or above hosts are sending.
-        if (num_send[-1] == 0): idle_rate += 1.0
+        if (num + ack) == 0: idle_rate += 1.0
 
+        # Check collision if two or above hosts are sending.        
+        is_ack = True
+        for i in range(2, setting.packet_time):
+            if num_send[-i] > 1:
+                is_ack = False
+                break
+        if num != 0: is_ack = False
+        if ack != 1: is_ack = False
         for host in hosts:
-            is_ack = True
-            for i in range(0, setting.packet_time):
-                if num_send[-i] > 1:
-                    is_ack = False
-                    break
             host.add_history(ack=is_ack)
         
     if show_history:
@@ -140,7 +144,7 @@ def slotted_aloha(setting, show_history=False):
     success_rate = 0.0
     idle_rate = 0.0
     collision_rate = 0.0
-    num_send = [0 for i in range(setting.packet_time)]
+    send_rate = 0
 
     for t in range(setting.total_time):
         # All hosts decide the action (send/idle/stop sending)
@@ -149,13 +153,13 @@ def slotted_aloha(setting, show_history=False):
         for host in hosts: host.get_state(t, send_rate=send_rate)
         
         # Hosts that decide to send send packets.
-        num_send.append(check_collision(hosts))
+        num, ack = check_collision(hosts)
+
+        if (num + ack) == 0: idle_rate += 1
 
         # Check collision if two or above hosts are sending.
-        if (num_send[-1] == 0): idle_rate += 1
-
+        is_ack = (num + ack == 1)
         for host in hosts:
-            is_ack = (num_send[-1] == 1)
             host.add_history(ack=is_ack)
         
     if show_history:
@@ -183,23 +187,28 @@ def csma(setting, show_history=False):
     idle_rate = 0.0
     collision_rate = 0.0
     num_send = [0 for i in range(setting.packet_time)]
+    num_ack = [0 for i in range(setting.packet_time)]
 
     for t in range(setting.total_time):
         # All hosts decide the action (send/idle/stop sending)
         for host in hosts: host.get_state(t, num_send=num_send[-setting.link_delay-1])
         
         # Hosts that decide to send send packets.
-        num_send.append(check_collision(hosts))
+        num, ack = check_collision(hosts)
+        num_send.append(num)
+        num_ack.append(ack)
+
+        if (num + ack) == 0: idle_rate += 1
 
         # Check collision if two or above hosts are sending.
-        if (num_send[-1] == 0): idle_rate += 1
-
+        is_ack = True
+        for i in range(2, setting.packet_time):
+            if (num_send[-i]+num_ack[-i]) > 1:
+                is_ack = False
+                break
+        if num != 0: is_ack = False
+        if ack != 1: is_ack = False
         for host in hosts:
-            is_ack = True
-            for i in range(1, setting.packet_time):
-                if num_send[-i] > 1:
-                    is_ack = False
-                    break
             host.add_history(delay=setting.link_delay, ack=is_ack)
         
     if show_history:
@@ -233,11 +242,12 @@ def csma_cd(setting, show_history=False):
         for host in hosts: host.get_state(t, num_send = num_send[-setting.link_delay-1], cd=True)
         
         # Hosts that decide to send send packets.
-        num_send.append(check_collision(hosts))
+        num, ack = check_collision(hosts)
+        num_send.append(num)
+
+        if (num + ack) == 0: idle_rate += 1
 
         # Check collision if two or above hosts are sending.
-        if (num_send[-1] == 0): idle_rate += 1
-
         for host in hosts:
             host.add_history(delay=setting.link_delay)
         
