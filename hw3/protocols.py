@@ -1,8 +1,6 @@
 import random
-from setting import Setting
-
 class my_host():
-    def __init__(self, packet, setting, is_binary_backoff=False):
+    def __init__(self, packet, setting):
         self.packet_time = setting.packet_time
         self.backoff_max = setting.max_colision_wait_time
         self.packets = packet
@@ -10,85 +8,78 @@ class my_host():
         self.num_data_sent = 0
         self.history = ""
         self.action = '.'
-        self.retranmit= False
-        # self.is_binary_backoff = is_binary_backoff
-        # self.binary_backoff = 0
-        self.num_backoff = 0 # 還沒做四次backoff就放棄傳送的機制
+        self.retransmit= False
         self.backoff = 0 
+        self.is_me = 0
+        # random.seed(1)
     
     def get_backoff(self):
-        # if self.is_binary_backoff: 
-        #     if self.binary_backoff == 0: self.num_backoff = random.randint(1, self.backoff_max)
-        #     else: self.num_backoff = 2*self.binary_backoff
-        # else: 
         if (self.backoff > 0): return
         self.backoff = random.randint(1, self.backoff_max)
     
-    def check_send(self, time):
-        if self.num_packet_sent == len(self.packets): return False
-        elif time >= self.packets[self.num_packet_sent]: return True
-        return False
+    def check_send(self, time):        
+        if self.num_packet_sent == len(self.packets): return False # packet all sent
+        # if there's any packet ready to be sent
+        return time >= self.packets[self.num_packet_sent]
 
     def do_idle(self, time, num_send, send_rate):
-        if self.backoff > 0: self.backoff -=1
-        if send_rate == -1: return
-        if self.check_send(time):
-            if num_send > 0: self.get_backoff()
-            elif self.backoff == 0 or ((random.uniform(0,1) < send_rate) & self.retranmit):
+        if self.backoff > 0: self.backoff -=1 # update backoff
+        if send_rate == -1: return # for slotted_aloha, check if at the start of a slot
+        if self.check_send(time): # check if there's any packet ready to be sent
+            if (random.uniform(0,1) < send_rate) and self.retransmit: # for slotted_aloha, retransmit for prob. p
+                self.action = "s" 
+                return
+            if self.backoff > 0: return # backoff -> do not send packet
+            if num_send == 1 and self.is_me > 0: 
                 self.action = "s"
-                
+                self.is_me = 0
+            elif num_send > 0:
+                self.get_backoff() # for csma&csma_cd sence channel busy -> backoff
+                return
+            else: self.action = "s"          
     def do_collision(self):
         self.action = "|"
-        self.num_data_sent = 0
-        self.num_backoff += 1
+        self.retransmit = True
+        self.num_data_sent = 0 # reset sending packet
         self.get_backoff()
-        self.retranmit = True
 
-    def get_state(self, time, num_send=0, send_rate=0, cs=False):
-        if self.action == ".":
-            # some packet(s) are ready to be sent
-            self.do_idle(time, num_send, send_rate)
+    def get_state(self, time, num_send=0, send_rate=0, cd=False):
+        if self.is_me > 0: self.is_me -= 1 # update is_me
+        if self.action == ".": self.do_idle(time, num_send, send_rate)
         elif self.action == "|":
             self.action = "."
             self.do_idle(time, num_send, send_rate)
-        elif self.action == "s":
-            if cs and (num_send > 1): 
-                self.do_collision()
-            elif self.history[-1] == "-" or self.history[-1] == "<": 
-                self.num_data_sent += 1
-                self.action = "s"
-            elif self.history[-1] == ">":
-                # finish sending one packet
-                self.retranmit = False
-                self.num_data_sent = 0
-                # if there's another packet ready to send
-                if self.check_send(time): self.action = "s"
-                else: self.action = "."
+        elif self.action == "s" or self.action == "a":
+            if cd and (num_send > 1): 
+                self.do_collision() # for csma/cd
+                return
+            self.num_data_sent += 1
+            if self.num_data_sent == self.packet_time-1: self.action = "a"
         else: print("unexpected state")
     
-    def add_history(self, ack=True):
-        if self.action == ".": self.history += "."
-        elif self.action == "|":
-            if self.history[-1] == "|": self.history += "."
-            else: self.history += "|"
-        elif self.action == "s":
-            if self.num_data_sent == 0: self.history += "<"
-            elif self.num_data_sent == self.packet_time-1: 
-                if ack: 
-                    self.history += ">"
-                    self.num_packet_sent += 1
-                else: 
-                    self.history += "|"
-                    self.do_collision()
+    def add_history(self, delay=0, ack=True):
+        if self.action == "s":
+            if self.num_data_sent == 0: self.history += "<"                
             else: self.history += "-"
+        elif self.action == "a":
+            if ack: 
+                # finish sending one packet
+                self.num_data_sent = 0
+                self.num_packet_sent += 1
+                self.retransmit = False
+                self.history += ">"
+                self.action = "."
+                if delay > 0: self.is_me = delay+1+1
+            else: 
+                self.history += "|"
+                self.do_collision()
         else: self.history += self.action
-
     def print_history(self, idx, total_time):
         send = list(' ' * total_time)
         for p in self.packets:
             send[p] = "V"
 
-        print("  : {}".format("".join(send)))
+        print("    {}".format("".join(send)))
         print("h{}: {}".format(idx, self.history))
 
 def check_collision(hosts):
@@ -96,8 +87,7 @@ def check_collision(hosts):
     for host in hosts:
         if host.action == "s" or host.action == "|": 
             num += 1
-        if num > 1: break
-        
+        if num > 1: return num        
     return num
 
 def aloha(setting, show_history=False):
@@ -125,7 +115,7 @@ def aloha(setting, show_history=False):
                 if num_send[-i] > 1:
                     is_ack = False
                     break
-            host.add_history(is_ack)
+            host.add_history(ack=is_ack)
         
     if show_history:
         # Show the history of each host
@@ -147,9 +137,9 @@ def aloha(setting, show_history=False):
 def slotted_aloha(setting, show_history=False):
     packets = setting.gen_packets()
     hosts = [my_host(packet, setting) for packet in packets]
-    success_rate = 0
-    idle_rate = 0
-    collision_rate = 0
+    success_rate = 0.0
+    idle_rate = 0.0
+    collision_rate = 0.0
     num_send = [0 for i in range(setting.packet_time)]
 
     for t in range(setting.total_time):
@@ -189,14 +179,14 @@ def slotted_aloha(setting, show_history=False):
 def csma(setting, show_history=False):
     packets = setting.gen_packets()
     hosts = [my_host(packet, setting) for packet in packets]
-    success_rate = 0
-    idle_rate = 0
-    collision_rate = 0
+    success_rate = 0.0
+    idle_rate = 0.0
+    collision_rate = 0.0
     num_send = [0 for i in range(setting.packet_time)]
 
     for t in range(setting.total_time):
         # All hosts decide the action (send/idle/stop sending)
-        for host in hosts: host.get_state(t, num_send=num_send[-setting.link_delay])
+        for host in hosts: host.get_state(t, num_send=num_send[-setting.link_delay-1])
         
         # Hosts that decide to send send packets.
         num_send.append(check_collision(hosts))
@@ -210,7 +200,7 @@ def csma(setting, show_history=False):
                 if num_send[-i] > 1:
                     is_ack = False
                     break
-            host.add_history(is_ack)
+            host.add_history(delay=setting.link_delay, ack=is_ack)
         
     if show_history:
         # Show the history of each host
@@ -233,14 +223,14 @@ def csma(setting, show_history=False):
 def csma_cd(setting, show_history=False):
     packets = setting.gen_packets()
     hosts = [my_host(packet, setting) for packet in packets] #, is_binary_backoff=True
-    success_rate = 0
-    idle_rate = 0
-    collision_rate = 0
+    success_rate = 0.0
+    idle_rate = 0.0
+    collision_rate = 0.0
     num_send = [0 for i in range(setting.packet_time)]
 
     for t in range(setting.total_time):
         # All hosts decide the action (send/idle/stop sending)
-        for host in hosts: host.get_state(t, num_send = num_send[-setting.link_delay], cs=True)
+        for host in hosts: host.get_state(t, num_send = num_send[-setting.link_delay-1], cd=True)
         
         # Hosts that decide to send send packets.
         num_send.append(check_collision(hosts))
@@ -249,14 +239,14 @@ def csma_cd(setting, show_history=False):
         if (num_send[-1] == 0): idle_rate += 1
 
         for host in hosts:
-            host.add_history()
+            host.add_history(delay=setting.link_delay)
         
     if show_history:
         # Show the history of each host
         print("csma_cd")
         for idx, host in enumerate(hosts):
             host.print_history(idx, setting.total_time)
-        print("")
+        # print("".join(map(str, num_send[1:])))
 
     success_rate = 0
     for host in hosts:
