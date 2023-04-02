@@ -1,22 +1,32 @@
 import random
 class Setting():
-    def __init__(self, host_num=3, total_time=10000, packet_num=500, packet_size=5, max_colision_wait_time=20, p_resend=0.3, link_delay=1, seed=None) -> None:
-        self.host_num = host_num # host 數量
-        self.total_time = total_time # 模擬時間總長，時間以1為最小時間單位
-        self.packet_num = packet_num # 每個 host 生成的封包數量
-        # packet time是完成一個封包所需的時間，包含了送packet的link delay和ack的link delay
-        # 假設等待ack的時間等同於link delay
-        self.packet_time = packet_size + 2*link_delay # 每個封包完成所需要的時間，等同於slotted aloha的slote size
+    def __init__(self, host_num=3, total_time=10000, packet_num=500, packet_size=5, max_colision_wait_time=None, p_resend=None, coefficient=8, link_delay=1, seed=None):
+        self.host_num = host_num
+        self.total_time = total_time # total simulation time
+        self.packet_num = packet_num # packet num for each host
+        # packet time is the time it takes for a packet to finish transmission, both packet's link delay and ack's link delay are included
+        # assume ack transmission time equals to the link delay
+        self.packet_time = packet_size + 2*link_delay # the packet time it takes for a packet to finish transmission, equals to slote size of slotted aloha
         self.packet_size = packet_size
-        self.max_colision_wait_time = max_colision_wait_time # ALOHA, CSMA, CSMA/cD 重新發送封包的最大等待時間
-        self.p_resend = p_resend # slotted aloha 每個slot開始時，重送封包的機率
-        self.link_delay = link_delay # link delay
+        self.max_colision_wait_time = max_colision_wait_time # maximum random backoff time, for aloha, csma, csma/cd
+        self.p_resend = p_resend # retransmission rate for slotted aloha
+        self.link_delay = link_delay
+        
         if seed is None:
             self.seed = random.randint(1, 10000)
         else:
-            self.seed = seed # seed 用於 random，同樣的 seed 會有相同的結果
+            self.seed = seed
+        
+        if max_colision_wait_time is None:
+            self.max_colision_wait_time = (host_num * packet_size) * coefficient
+        else:
+            self.max_colision_wait_time = max_colision_wait_time 
+        if p_resend is None:
+            self.p_resend = (1.0/host_num)/coefficient
+        else:
+            self.p_resend = p_resend 
 
-    # hosts產生封包的時間
+    # format
     # e.g.
     #   [[10, 20, 30], # host 0
     #    [20, 30, 50], # host 1
