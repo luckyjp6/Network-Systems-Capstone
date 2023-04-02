@@ -15,8 +15,8 @@ def test():
     print(csma_cd_rates)
 
 protocal_names = ["aloha", "slotted_aloha", "csma", "csma/cd"]
-host_num_list = [2, 3, 4, 6]
-packet_num_list = [1200, 800, 600, 400]
+host_num_list = [2, 3, 4, 6, 8, 12, 24]
+packet_num_list = [1200, 800, 600, 400, 300, 200, 100]
 rates = [[] for i in range(4)]
 def plot(title, x_label, target):
     global protocal_names, rates
@@ -151,7 +151,7 @@ def Q7():
         t = [[sum(x)/total_simulation for x in t[pro]] for pro in range(4)]
         for i in range(4): rates[i].append(t[i])
     rates = [[[rates[i][p][r] for p in range(len(rates[i]))] for r in range(3)] for i in range(4)]
-    plot("Influence of Host Num", "Host Num", [p for p in range(1, 20)])
+    plot("Influence of Packet Size", "Packet Size", [p for p in range(1, 20)])
 
 def Q8():
     global rates, protocal_names

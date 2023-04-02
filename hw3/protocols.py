@@ -58,7 +58,7 @@ class my_host():
             if self.num_data_sent == self.packet_time-1: self.action = "a"
         else: print("unexpected state")
     
-    def add_history(self, delay=0, ack=True):
+    def add_history(self, delay=-1, ack=True):
         if self.action == "s":
             if self.num_data_sent == 0: self.history += "<"                
             else: self.history += "-"
@@ -69,7 +69,7 @@ class my_host():
                 self.num_packet_sent += 1
                 self.retransmit = False
                 self.history += ">"
-                if delay > 0: self.is_me = delay+1+1
+                if delay >= 0: self.is_me = delay+1+1
             else: 
                 self.history += "|"
                 self.do_collision()
