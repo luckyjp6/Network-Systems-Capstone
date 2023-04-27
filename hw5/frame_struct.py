@@ -11,6 +11,7 @@ class QUIC_packet():
         if (self.types == "stream"): self.payload = STREAM_frame(" ".join(data[idx:]))
         elif (self.types == "ack"): self.payload = ACK_frame(" ".join(data[idx:]))
         elif (self.types == "init"): self.payload = INIT_frame(" ".join(data[idx:]))
+        elif (self.types == "max_data"): self.payload = MAX_DATA_frame(" ".join(data[idx:]))
     
     def set(self, pn, types, payload) -> None:
         self.pn = pn
@@ -77,9 +78,9 @@ class STREAM_frame():
 
 class ACK_frame():
     def __init__(self, data=b''):
+        self.ack_range = []
         if len(data) == 0: return
         data = data.split(' ')
-        self.ack_range = []
         for d in data:
             item = d.split(',')
             self.ack_range.append((int(item[0]), int(item[1])))
@@ -97,8 +98,8 @@ class ACK_frame():
         return s[:-1]
 
 class MAX_DATA_frame():
-    def __init__(self, max_len=0) -> None:
-        self.max_len = max_len
+    def __init__(self, max_len=b'') -> None:
+        self.max_len = int(max_len)
         return
     
     def set(self, max_len) -> None:

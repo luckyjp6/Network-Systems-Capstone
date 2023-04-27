@@ -48,24 +48,26 @@ class recv_pn:
 
     def get_needed(self):
         self.recv.sort()
+        max_pn = max(self.recv)
         ack = [] # (up, down-1)
-        now = self.lower_bound
+        now_idx = 0
         now_len = 0
-        for pn in self.recv:
+        for now in range(self.lower_bound, max_pn+1):
+            pn = self.recv[now_idx]
             if pn != now:
                 if now_len > 0: 
-                    ack.append((now-1, now - now_len))
-                    now_len = 0
-                now = pn
+                    ack.append((now-1, now - now_len-1))
+                now_len = 0
             else:
-                now += 1
                 now_len += 1
+                now_idx += 1
+                if now == max_pn: ack.append((now, now - now_len))
 
-        if now_len > 0: ack.append((now-1, now_len))
-        if (ack[0][1]+1) == self.lower_bound:
-            self.lower_bound = ack[0][0]
+        if len(ack) > 0:
+            if (ack[0][1]+1) == self.lower_bound:
+                self.lower_bound = ack[0][0]
 
-            rm_len = ack[0][0] - ack[0][1] -1
-            del self.recv[0:rm_len]
+                rm_len = ack[0][0] - ack[0][1]
+                del self.recv[0:rm_len]
 
         return ack
