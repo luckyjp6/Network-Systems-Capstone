@@ -1,36 +1,35 @@
+Max_payload = 1000
+
 class QUIC_packet():
-    def __init__(self, buf=""):
+    def __init__(self, buf=b''):
         if len(buf) == 0: return
         data = buf.split(' ')
         idx = 0
-        self.conn_id = int(data[idx]); idx += 1
         self.pn = int(data[idx]); idx += 1
         self.types = data[idx]; idx += 1
         self.payload = ""
         if (self.types == "stream"): self.payload = STREAM_frame(" ".join(data[idx:]))
-        elif (self.types == "ack"): self.payload = ACK_frame("".join(data[idx:]))
-        elif (self.types == "init"): self.payload = INIT_frame("".join(data[idx:]))
+        elif (self.types == "ack"): self.payload = ACK_frame(" ".join(data[idx:]))
+        elif (self.types == "init"): self.payload = INIT_frame(" ".join(data[idx:]))
     
-    def set(self, conn_id, pn, types, payload) -> None:
-        self.conn_id = conn_id
+    def set(self, pn, types, payload) -> None:
         self.pn = pn
         self.types = types
-        self.payload = ""
-        if (self.types == "stream"): self.payload = STREAM_frame(payload)
-        elif (self.types == "ack"): self.payload = ACK_frame(payload)
-        elif (self.types == "init"): self.payload = INIT_frame(payload)
+        self.payload = payload
+        # if (self.types == "stream"): self.payload = STREAM_frame(payload)
+        # elif (self.types == "ack"): self.payload = ACK_frame(payload)
+        # elif (self.types == "init"): self.payload = INIT_frame(payload)
         return
 
     def to_string(self) -> str:
         s = ""
-        s += str(self.conn_id) + " "
         s += str(self.pn) + " "
         s += self.types + " "
-        s += self.payload.to_string()
+        s += self.payload
         return s
 
 class INIT_frame():
-    def __init__(self, buf=""):
+    def __init__(self, buf=b''):
         if len(buf) == 0: return
         data = buf.split(',') # ("127.0.0.1",10013)
         self.info = (data[0][2:-1], int(data[1][:-1]))
@@ -47,7 +46,7 @@ class INIT_frame():
         return s
 
 class STREAM_frame():
-    def __init__(self, data="") -> None:
+    def __init__(self, data=b'') -> None:
         if len(data) == 0: return
         data = data.split(' ')
         idx = 0
@@ -56,6 +55,7 @@ class STREAM_frame():
         self.fin = int(data[idx]); idx += 1
         self.offset = int(data[idx]); idx += 1
         self.payload = "".join(data[idx:])
+        self.payload = self.payload
         return
     
     def set(self, stream_id, packet_len, fin, offset, payload) -> None:
@@ -63,7 +63,7 @@ class STREAM_frame():
         self.packet_len = packet_len
         self.fin = fin
         self.offset = offset
-        self.payload = payload
+        self.payload = payload.decode()
         return
     
     def to_string(self) -> str:
@@ -76,30 +76,25 @@ class STREAM_frame():
         return s
 
 class ACK_frame():
-    def __init__(self, data=""):
+    def __init__(self, data=b''):
         if len(data) == 0: return
         data = data.split(' ')
-        idx = 0
-        self.largest_pn = int(data[idx]); idx += 1
-        self.delay = int(data[idx]); idx += 1
-        self.ack_range = int(data[idx]); idx += 1
-        self.first_range = int(data[idx]); idx += 1
+        self.ack_range = []
+        for d in data:
+            item = d.split(',')
+            self.ack_range.append((int(item[0]), int(item[1])))
         return
+        
     
-    def set(self, largest_pn, delay, ack_range, first_range) -> None:
-        self.largest_pn = largest_pn
-        self.delay = delay
+    def set(self, ack_range) -> None:
         self.ack_range = ack_range
-        self.first_range = first_range
         return
 
     def to_string(self) -> str:
         s = ""
-        s += str(self.largest_pn) + " "
-        s += str(self.delay) + " "
-        s += str(self.ack_range) + " "
-        s += str(self.first_range)
-        return s
+        for ran in self.ack_range:
+            s += str(ran[0]) + "," + str(ran[1]) + " "
+        return s[:-1]
 
 class MAX_DATA_frame():
     def __init__(self, max_len=0) -> None:
