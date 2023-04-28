@@ -1,14 +1,5 @@
-# import socket
-# import frame_struct as fr
-# import recv_structure as rs
-# import threading
-# import time
 from socket_func import *
 
-# recv_dict = threading.Lock()
-time_to_stop = False
-# recv_pn = rs.recv_pn()
-# recv_streams = dict()
 class QUICClient:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -61,10 +52,11 @@ if __name__ == "__main__":
     client.connect(("127.0.0.1", 30000))
     # client.send(0, "test")
     # while(True):
-    for i in range(3):
+    for i in range(500):
+        client.send(i, b'a'*3000)
+    for i in range(500):
         # client.send()
         id, payload = client.recv()
         print(id, i)
         # client.recv()
-    print("out")
     client.close()

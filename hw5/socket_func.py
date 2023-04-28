@@ -5,13 +5,15 @@ import frame_struct as fr
 import recv_structure as rs
 
 time_to_stop = False
-send_window = 1000
+send_window = 10
+send_timeout = 0
 # to_addr = ""
 # self_addr = ""
 
 reply_lock = threading.Lock()
 reply_queue = list()
 send_lock = threading.Lock()
+send_idx = list()
 wait_to_send = dict()
 recv_lock = threading.Lock()
 recv_streams = dict()
@@ -37,7 +39,7 @@ def send_packet(s:socket.socket, to_addr, pn, types, payload) -> None:
     packet = fr.QUIC_packet()
     packet.set(pn, types, payload)
     try:
-        # print("send {}->{}: {}".format(s.getsockname(), to_addr, packet.to_string()))
+        # print("send {}->{}".format(s.getsockname(), to_addr))
         s.sendto(packet.to_string().encode(), to_addr)
     except:
         print("broken pipe")
@@ -45,7 +47,7 @@ def send_packet(s:socket.socket, to_addr, pn, types, payload) -> None:
     return
 
 def add_send_queue(pn, stream_id, data):
-    global wait_to_send, send_lock
+    global wait_to_send, send_lock, send_idx
 
     num_segment = int(len(data)/fr.Max_payload)+1
     last = len(data) - (num_segment-1)*fr.Max_payload
@@ -59,6 +61,7 @@ def add_send_queue(pn, stream_id, data):
         stream_payload.set(stream_id, length, fin, offset, data[offset:offset+length])
         offset += fr.Max_payload
         wait_to_send[pn] = stream_payload.to_string()
+        send_idx.append(pn)
         pn += 1
     send_lock.release()
 
@@ -76,58 +79,66 @@ def check_done():
     return -1
 
 def send_loop(s:socket.socket, to_addr):
-    global wait_to_send, send_lock, send_window, reply_queue, reply_lock
+    global wait_to_send, send_lock, send_window, reply_queue, reply_lock#, send_timeout
 
     now_at = 0
-    to_limit = False
+    reply_lock.acquire()
+    reply_lock.release()
     while True:
-        # wait if empty
-        while (not wait_to_send) and (len(reply_queue) == 0): continue
+        # wait data
+        while not wait_to_send: continue
 
+        num_send = 0 # for congestion control
+
+        max_send = min(send_window, len(send_idx)) # send window
+        num_send += max_send
+        send_lock.acquire()
+        # send every thing
+        for i in range(max_send):
+            if now_at >= len(send_idx): now_at = 0
+            pn = send_idx[now_at]
+            if pn == -1: 
+                s.close(); exit() # termination
+
+            send_packet(s, to_addr, pn, "stream", wait_to_send[pn])
+            
+            now_at += 1; 
+        send_lock.release()
+
+        # time.sleep(0.05)
+        
+        for i in range(30):
+            if len(reply_queue) > 0: break
+            time.sleep(0.0001)
+
+        # send ack is prioritized
         if len(reply_queue) > 0:
+            # print(reply_queue)
             reply_lock.acquire()
             for item in reply_queue:
-                send_packet(s, to_addr, 0, item[0], item[1])
+                if len(item) == 0: continue
+                send_packet(s, to_addr, 0, "ack", item)
             reply_lock.release()
             reply_queue.clear()
             continue
 
-        if not to_limit: now_at = 0
-        num_send = 0
-        to_limit = False
 
-        send_lock.acquire()
-        # send every thing
-        for pn, frame in wait_to_send.items(): # pn: STREAM_frame.to_string()
-            if pn == -1: 
-                s.close()
-                exit()
-            if pn >= now_at: 
-                send_packet(s, to_addr, pn, "stream", frame)
-                num_send += 1
-                send_window -= 1
-                now_at = pn
-                if send_window <= 0: 
-                    to_limit = True
-                    break
-        send_lock.release()
-
-        time.sleep(0.5)
-
-def recv_loop(s:socket.socket, to_addr):
-    global time_to_stop, recv_pn, in_recv
+def recv_loop(s:socket.socket):
+    global time_to_stop, recv_pn, in_recv#, send_timeout
     num_recv = 0
+    # get_ack = False
     while True:
         packet = get_packet(s)
         if packet == None:
-            if time_to_stop: 
-                send_ack(s, to_addr)
+            if time_to_stop:
+                send_ack(s)
                 in_recv = True
                 exit()
-            if num_recv <= 0: continue
-
-            send_ack(s, to_addr); send_max_data(s, to_addr, num_recv)
-            num_recv = 0
+            # if num_recv <= 0: continue
+            # if not get_ack: send_timeout += 1
+            # else: send_timeout = 10
+            continue
+            send_ack(s); # send_max_data(s, to_addr, recv_pn.lower_bound+num_recv)
         elif packet.types == "stream":
             num_recv += 1
             # record packet
@@ -135,30 +146,44 @@ def recv_loop(s:socket.socket, to_addr):
             # record pn
             recv_pn.add(packet.pn)
         elif packet.types == "ack":
-            global send_lock
+            global send_lock, wait_to_send, send_idx
+            # get_ack = True
             acks = packet.payload.ack_range
             send_lock.acquire()
             for ack in acks:
                 for id in range(ack[0], ack[1]):
-                    if id in wait_to_send: wait_to_send.pop(id)
+                    if id in wait_to_send: 
+                        # print("pop", id)
+                        # print("send idx", id, send_idx)
+                        send_idx.remove(id)
+                        wait_to_send.pop(id)
             send_lock.release()
-        elif packet.types == "max_data":
-            global send_window
-            send_window = packet.payload.max_len
+        if num_recv >= 100: 
+            send_ack(s)
+            num_recv = 0
+        # elif packet.types == "max_data":
+        #     global send_window
+        #     send_window = packet.payload.max_len
     """
     congestion control
     """
 
-def send_ack(s:socket.socket, to_addr):
+def send_ack(s:socket.socket):
     global recv_pn, reply_queue, reply_lock
     # send ack
     ack_packet = fr.ACK_frame()
     acks = recv_pn.get_needed()
-    if len(acks) == 0: return
+    
+    if len(acks) == 0: 
+        # reply_lock.acquire()        
+        # reply_queue.append("")
+        # reply_lock.release()
+        return
+    
     ack_packet.set(acks)
 
     reply_lock.acquire()
-    reply_queue.append(("ack", ack_packet.to_string()))
+    reply_queue.append(ack_packet.to_string())
     reply_lock.release()
     # send_packet(s, to_addr, 0, "ack", ack_packet.to_string())
     return
@@ -189,19 +214,19 @@ def start_thread(to_addr, recv_socket):
     recv_socket.settimeout(0.01)
     send_thread = threading.Thread(target=send_loop, args=[recv_socket, to_addr])
     send_thread.start()
-    recv_thread = threading.Thread(target=recv_loop, args=[recv_socket, to_addr])
+    recv_thread = threading.Thread(target=recv_loop, args=[recv_socket])
     recv_thread.start()
 
 def safe_close(s:socket.socket):
-    global time_to_stop, wait_to_send, reply_queue, in_recv
+    global time_to_stop, wait_to_send, send_idx, reply_queue, in_recv
     
     # wait until all packets sent
     while wait_to_send: continue
 
-    # last ack
-    in_recv = False    
+    # last ack   
     # print("wait entering recv_loop")
     # enshure entering recv_loop
+    in_recv = False 
     while not in_recv: time_to_stop = True
     # print("wait reply sent")
     # wait send_loop handle reply
@@ -210,5 +235,7 @@ def safe_close(s:socket.socket):
     # stop
     send_lock.acquire()
     wait_to_send[-1] = "no"
+    send_idx.append(-1)
     send_lock.release()
+    # print("wait send exit")
     while threading.active_count() > 1: continue

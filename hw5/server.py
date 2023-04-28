@@ -1,12 +1,5 @@
-# import socket
-# import time
-# import frame_struct as fr
-# import threading
 from socket_func import *
 
-# send_dict = threading.Lock()
-# wait_to_send = dict()
-# allow_to_send = 500
 class QUICServer:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -50,13 +43,16 @@ class QUICServer:
 #     print(recv_data.decode("utf-8")) # Hello Server!
 #     server.close() 
 if __name__ == "__main__":
-    # socket.setdefaulttimeout(2)
     server = QUICServer()
     server.listen(("127.0.0.1", 30000))
     server.accept()
     # while(True):
-    for i in range(3):
+    for i in range(500):
         server.send(i, b'a'*3000)
+    for i in range(500):
+        # client.send()
+        id, payload = server.recv()
+        print(id, i)
     #     server.recv()
 
     server.close()
