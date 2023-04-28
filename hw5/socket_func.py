@@ -5,7 +5,8 @@ import frame_struct as fr
 import recv_structure as rs
 
 time_to_stop = False
-send_window = 10
+send_window = 1000
+send_amount = 10
 send_timeout = 0
 # to_addr = ""
 # self_addr = ""
@@ -18,6 +19,7 @@ wait_to_send = dict()
 recv_lock = threading.Lock()
 recv_streams = dict()
 recv_pn = rs.recv_pn()
+pn_to_stream = dict()
 
 def get_packet(s:socket.socket, need_addr=False) -> fr.QUIC_packet:
     packet = ""
@@ -47,22 +49,26 @@ def send_packet(s:socket.socket, to_addr, pn, types, payload) -> None:
     return
 
 def add_send_queue(pn, stream_id, data):
-    global wait_to_send, send_lock, send_idx
+    global wait_to_send, send_lock, send_idx, pn_to_stream
 
     num_segment = int(len(data)/fr.Max_payload)+1
     last = len(data) - (num_segment-1)*fr.Max_payload
     offset = 0
-
-    send_lock.acquire()
+    
+    stream_data = dict()
     for i in range(num_segment):
         fin = int(i == num_segment-1)
         length = last if fin else fr.Max_payload
         stream_payload = fr.STREAM_frame()
         stream_payload.set(stream_id, length, fin, offset, data[offset:offset+length])
         offset += fr.Max_payload
-        wait_to_send[pn] = stream_payload.to_string()
-        send_idx.append(pn)
+        stream_data[pn] = stream_payload.to_string()
+        pn_to_stream[pn] = stream_id
         pn += 1
+
+    send_lock.acquire()
+    wait_to_send[stream_id] = stream_data
+    send_idx.append(stream_id)
     send_lock.release()
 
     return pn
@@ -79,34 +85,39 @@ def check_done():
     return -1
 
 def send_loop(s:socket.socket, to_addr):
-    global wait_to_send, send_lock, send_window, reply_queue, reply_lock#, send_timeout
+    global wait_to_send, send_lock, send_window, reply_queue, reply_lock, send_amount, pn_to_stream
 
     now_at = 0
     reply_lock.acquire()
     reply_lock.release()
     while True:
         # wait data
-        while (not wait_to_send) and (len(reply_queue) == 0): continue
-
+        while (not send_idx) and (not reply_queue): continue
+        # print(wait_to_send)
         if wait_to_send:
             num_send = 0 # for congestion control
 
-            max_send = min(send_window, len(send_idx)) # send window
-            num_send += max_send
+            window_max = min(send_window, len(send_idx)-1) # send window
+            send_amount_max = min(send_amount, len(send_idx)-1) # maximum number of packet sent one time
+
+            num_send += send_amount_max
             send_lock.acquire()
             # send every thing
-            for i in range(max_send):
-                if now_at >= len(send_idx): now_at = 0
-                pn = send_idx[now_at]
-                if pn == -1: 
-                    s.close(); exit() # termination
+            for i in range(send_amount_max):
+                if now_at >= window_max: now_at = 0 # max stream num
+                stream_id = send_idx[now_at]
 
-                send_packet(s, to_addr, pn, "stream", wait_to_send[pn])
+                if stream_id == -1: # termination
+                    s.close()
+                    exit()
+
+                for pn, frame in wait_to_send[stream_id].items():
+                    send_packet(s, to_addr, pn, "stream", frame)
                 
                 now_at += 1; 
             send_lock.release()
         
-        for i in range(10):
+        for i in range(50):
             if len(reply_queue) > 0: break
             time.sleep(0.0001)
 
@@ -150,12 +161,16 @@ def recv_loop(s:socket.socket):
             acks = packet.payload.ack_range
             send_lock.acquire()
             for ack in acks:
-                for id in range(ack[0], ack[1]):
-                    if id in wait_to_send: 
-                        # print("pop", id)
+                for idx in range(ack[0], ack[1]):
+                    if idx in send_idx: 
+                        print("pop", idx)
                         # print("send idx", id, send_idx)
-                        send_idx.remove(id)
-                        wait_to_send.pop(id)
+                        stream_id = pn_to_stream[idx]
+                        pn_to_stream.pop(idx)
+                        if idx in wait_to_send[stream_id]: wait_to_send[stream_id].pop(idx)
+                        if not wait_to_send[stream_id]: 
+                            wait_to_send.pop(stream_id)
+                            send_idx.remove(stream_id)
             send_lock.release()
         if num_recv >= 10: 
             send_ack(s)
@@ -172,7 +187,7 @@ def send_ack(s:socket.socket):
     # send ack
     ack_packet = fr.ACK_frame()
     acks = recv_pn.get_needed()
-    if len(acks) == 0: return
+    if acks == None: return
     
     ack_packet.set(acks)
 

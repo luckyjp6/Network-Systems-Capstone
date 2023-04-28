@@ -82,8 +82,12 @@ class ACK_frame():
         if len(data) == 0: return
         data = data.split(' ')
         for d in data:
+            # if len(d) == 0: continue
             item = d.split(',')
+            # try:
             self.ack_range.append((int(item[0]), int(item[1])))
+            # except:
+                # print(data)
         return
         
     

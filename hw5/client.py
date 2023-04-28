@@ -50,12 +50,14 @@ class QUICClient:
 if __name__ == "__main__":
     client = QUICClient()
     client.connect(("127.0.0.1", 30000))
+    # i = 0
     # while(True):
-    #     client.send(i, b'a'*3000)
-    #     client.recv()
-    for i in range(500):
+        # client.send(i, b'a'*3000)
+        # client.recv()
+        # i += 1
+    for i in range(10):
         client.send(i, b'a'*500)
-    for i in range(1000):
+    for i in range(10):
         id, payload = client.recv()
         print(id, i)
 

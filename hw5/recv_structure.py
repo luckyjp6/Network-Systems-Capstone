@@ -51,10 +51,9 @@ class recv_pn:
         return True
 
     def get_needed(self):
-        ack = [] # (down, up+1)
         if len(self.recv) == 0: 
             if self.most_lower != None: return [(self.most_lower, self.lower_bound)]
-            else: return ack
+            else: return None
         self.recv.sort()
 
         if self.most_lower == None: 
@@ -63,6 +62,7 @@ class recv_pn:
         # else: ack.append((self.most_lower, self.lower_bound+1))
         
         self.upper_bound = max(self.recv)
+        ack = [] # (down, up+1)
         now_idx = 0
         now_len = 0
         for now in range(self.lower_bound, self.upper_bound+1):
@@ -87,4 +87,8 @@ class recv_pn:
         # else: ack.append((self.most_lower, self.lower_bound))
         # print("lower bound", self.lower_bound, self.recv, ack)
         # print("")
+        for a in ack:
+            if len(a) != 2: 
+                print(ack)
+                return
         return ack
