@@ -55,9 +55,9 @@ if __name__ == "__main__":
         # client.send(i, b'a'*3000)
         # client.recv()
         # i += 1
-    for i in range(10):
-        client.send(i, b'a'*500)
-    for i in range(10):
+    for i in range(1000):
+        client.send(i, b'a'*3000)
+    for i in range(1000):
         id, payload = client.recv()
         print(id, i)
 

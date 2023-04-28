@@ -87,8 +87,5 @@ class recv_pn:
         # else: ack.append((self.most_lower, self.lower_bound))
         # print("lower bound", self.lower_bound, self.recv, ack)
         # print("")
-        for a in ack:
-            if len(a) != 2: 
-                print(ack)
-                return
+        # print(ack)
         return ack
