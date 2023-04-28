@@ -36,7 +36,8 @@ class recv_data:
     
 class recv_pn:
     def __init__(self) -> None:
-        self.lower_bound = 0
+        self.most_lower = None
+        self.lower_bound = -1
         self.recv = []
 
     def add(self, pn):
@@ -47,27 +48,32 @@ class recv_pn:
         self.recv.append(pn)
 
     def get_needed(self):
+        ack = [] # (down, up+1)
+        if len(self.recv) == 0: return ack
         self.recv.sort()
+
+        if self.most_lower == None: 
+            self.most_lower = min(self.recv)
+            self.lower_bound = self.most_lower+1
+        else: ack.append((self.most_lower, self.lower_bound))
+        
         max_pn = max(self.recv)
-        ack = [] # (up, down-1)
         now_idx = 0
         now_len = 0
-        for now in range(self.lower_bound, max_pn+1):
+        for now in range(self.lower_bound-1, max_pn+1):
             pn = self.recv[now_idx]
             if pn != now:
                 if now_len > 0: 
-                    ack.append((now-1, now - now_len-1))
+                    ack.append((now - now_len, now))
                 now_len = 0
             else:
                 now_len += 1
                 now_idx += 1
-                if now == max_pn: ack.append((now, now - now_len))
+                if now == max_pn: ack.append((now - now_len+1, now+1))
 
-        if len(ack) > 0:
-            if (ack[0][1]+1) == self.lower_bound:
-                self.lower_bound = ack[0][0]
-
-                rm_len = ack[0][0] - ack[0][1]
-                del self.recv[0:rm_len]
+        if ack[0][0] == self.lower_bound:
+            self.lower_bound = ack[0][1]
+            rm_len = ack[0][0] - ack[0][1]
+            del self.recv[:rm_len]
 
         return ack
