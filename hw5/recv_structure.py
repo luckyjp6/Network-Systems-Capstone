@@ -43,15 +43,18 @@ class recv_pn:
 
     def add(self, pn):
         # already received
-        if pn in self.recv: return
+        if pn in self.recv: return False
         if self.lower_bound != None:
-            if pn >= self.most_lower and pn < self.lower_bound: return
+            if pn >= self.most_lower and pn < self.lower_bound: return False
 
         self.recv.append(pn)
+        return True
 
     def get_needed(self):
         ack = [] # (down, up+1)
-        if len(self.recv) == 0: return ack
+        if len(self.recv) == 0: 
+            if self.most_lower != None: return [(self.most_lower, self.lower_bound)]
+            else: return ack
         self.recv.sort()
 
         if self.most_lower == None: 
@@ -81,7 +84,7 @@ class recv_pn:
                 del self.recv[:rm_len]
                 del ack[0]
             ack.append((self.most_lower, self.lower_bound))
-        else: ack.append((self.most_lower, self.lower_bound))
+        # else: ack.append((self.most_lower, self.lower_bound))
         # print("lower bound", self.lower_bound, self.recv, ack)
         # print("")
         return ack

@@ -47,12 +47,12 @@ if __name__ == "__main__":
     server.listen(("127.0.0.1", 30000))
     server.accept()
     # while(True):
+    #     server.send(i, b'a'*3000)
+    #     server.recv()
+    for i in range(1000):
+        server.send(i, b'a'*500)
     for i in range(500):
-        server.send(i, b'a'*3000)
-    for i in range(500):
-        # client.send()
         id, payload = server.recv()
         print(id, i)
-    #     server.recv()
 
     server.close()
