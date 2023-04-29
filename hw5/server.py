@@ -51,9 +51,9 @@ if __name__ == "__main__":
         # server.send(i, b'a'*3000)
         # server.recv()
         # i+=1
-    for i in range(1000):
-        server.send(i, b'a'*3000)
-    for i in range(1000):
+    for i in range(10):
+        server.send(i, b'abx')
+    for i in range(10):
         id, payload = server.recv()
         print(id, i)
 

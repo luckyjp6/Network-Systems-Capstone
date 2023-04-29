@@ -79,10 +79,11 @@ class STREAM_frame():
 class ACK_frame():
     def __init__(self, data=b''):
         self.ack_range = []
+        self.total_num = 0
         if len(data) == 0: return
         data = data.split(' ')
-        for d in data:
-            # if len(d) == 0: continue
+        self.total_num = int(data[0])
+        for d in data[1:]:
             item = d.split(',')
             # try:
             self.ack_range.append((int(item[0]), int(item[1])))
@@ -91,12 +92,14 @@ class ACK_frame():
         return
         
     
-    def set(self, ack_range) -> None:
+    def set(self, total_num, ack_range) -> None:
+        self.total_num = total_num
         self.ack_range = ack_range
         return
 
     def to_string(self) -> str:
         s = ""
+        s += str(self.total_num) + " "
         for ran in self.ack_range:
             s += str(ran[0]) + "," + str(ran[1]) + " "
         return s[:-1]

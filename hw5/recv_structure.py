@@ -3,6 +3,7 @@ from frame_struct import Max_payload as max_len
 class recv_data:
     def __init__(self) -> None:
         self.num = 0
+        self.stream_id = []
         self.data = []
         return
     
@@ -36,56 +37,29 @@ class recv_data:
     
 class recv_pn:
     def __init__(self) -> None:
-        self.most_lower = None
-        self.lower_bound = None
-        self.upper_bound = None
         self.recv = []
 
     def add(self, pn):
         # already received
-        if pn in self.recv: return False
-        if self.lower_bound != None:
-            if pn >= self.most_lower and pn < self.lower_bound: return False
-
         self.recv.append(pn)
-        return True
 
     def get_needed(self):
-        if len(self.recv) == 0: 
-            if self.most_lower != None: return [(self.most_lower, self.lower_bound)]
-            else: return None
+        total_num = len(self.recv)
+        if total_num == 0: return 0, None
+        
         self.recv.sort()
 
-        if self.most_lower == None: 
-            self.most_lower = min(self.recv)
-            self.lower_bound = self.most_lower
-        # else: ack.append((self.most_lower, self.lower_bound+1))
-        
-        self.upper_bound = max(self.recv)
         ack = [] # (down, up+1)
-        now_idx = 0
-        now_len = 0
-        for now in range(self.lower_bound, self.upper_bound+1):
-            pn = self.recv[now_idx]
-            if pn != now:
-                if now_len > 0: 
-                    ack.append((now - now_len, now))
-                now_len = 0
+        start = min(self.recv)
+        prev = start
+        for p in self.recv:
+            if p <= prev + 1: 
+                prev = p
+                continue
             else:
-                now_len += 1
-                now_idx += 1
-                if now == self.upper_bound: ack.append((now - now_len+1, now+1))
-        # print("")
-        # print("lower bound", self.lower_bound, self.recv, ack)
-        if len(ack) > 0:
-            if ack[0][0] == self.lower_bound:
-                self.lower_bound = ack[0][1]
-                rm_len = ack[0][1] - ack[0][0]
-                del self.recv[:rm_len]
-                del ack[0]
-            ack.append((self.most_lower, self.lower_bound))
-        # else: ack.append((self.most_lower, self.lower_bound))
-        # print("lower bound", self.lower_bound, self.recv, ack)
-        # print("")
-        # print(ack)
-        return ack
+                ack.append((start, prev+1))
+                start = p
+                prev = p
+        ack.append((start, prev+1))
+        self.recv.clear()
+        return total_num, ack

@@ -13,11 +13,11 @@ class QUICClient:
         init_packet = fr.INIT_frame()
         init_packet.set(socket_addr)
 
-        # packet = fr.QUIC_packet()
-        # packet.set(0, "init", init_packet.to_string())
+        packet = fr.QUIC_packet()
+        packet.set(0, "init", init_packet.to_string())
         # print("send to {}: {}".format(to_addr, packet.to_string()))
-        # self.socket.sendto(packet.to_string().encode(), to_addr)
-        send_packet(self.socket, to_addr, 0, "init", init_packet.to_string())
+        self.socket.sendto(packet.to_string().encode(), to_addr)
+        # send_packet(self.socket, 0, "init", init_packet.to_string())
 
         start_thread(to_addr, self.socket)
         return
@@ -55,9 +55,9 @@ if __name__ == "__main__":
         # client.send(i, b'a'*3000)
         # client.recv()
         # i += 1
-    for i in range(1000):
-        client.send(i, b'a'*3000)
-    for i in range(1000):
+    for i in range(10):
+        client.send(i, b'abc')
+    for i in range(10):
         id, payload = client.recv()
         print(id, i)
 
