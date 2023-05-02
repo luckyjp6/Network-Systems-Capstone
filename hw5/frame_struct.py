@@ -79,11 +79,23 @@ class STREAM_frame():
 class ACK_frame():
     def __init__(self, data=b''):
         self.ack_range = []
+        self.stream_remain = dict()
         self.total_num = 0
+        self.max_pn = 0
         if len(data) == 0: return
         data = data.split(' ')
         self.total_num = int(data[0])
-        for d in data[1:]:
+        self.max_pn = int(data[1])
+
+        if len(data) < 3: return
+        remains = data[2].split(',')
+        for r in remains:
+            r = r.split(':')
+            if len(r) == 1: break
+            self.stream_remain[int(r[0])] = int(r[1])
+
+        if self.total_num == 0: return
+        for d in data[3:]:
             item = d.split(',')
             # try:
             self.ack_range.append((int(item[0]), int(item[1])))
@@ -92,16 +104,31 @@ class ACK_frame():
         return
         
     
-    def set(self, total_num, ack_range) -> None:
+    def set(self, total_num, max_pn, stream_remain, ack_range) -> None:
         self.total_num = total_num
+        self.max_pn = max_pn
+        self.stream_remain = stream_remain
         self.ack_range = ack_range
         return
 
     def to_string(self) -> str:
         s = ""
         s += str(self.total_num) + " "
+        s += str(self.max_pn)
+        
+        s += " "
+
+        if len(self.stream_remain) > 0: 
+            for id, r in self.stream_remain.items():
+                s += str(id) + ":" + str(r) + ","        
+            s = s[:-1]
+
+        
+        if self.ack_range == None: return s
+        s += " "
         for ran in self.ack_range:
             s += str(ran[0]) + "," + str(ran[1]) + " "
+
         return s[:-1]
 
 class MAX_DATA_frame():

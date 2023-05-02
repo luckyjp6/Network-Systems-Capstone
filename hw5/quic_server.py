@@ -46,13 +46,9 @@ if __name__ == "__main__":
     server = QUICServer()
     server.listen(("127.0.0.1", 30000))
     server.accept()
-    i = 0
-    # while(True):
-        # server.send(i, b'a'*3000)
-        # server.recv()
-        # i+=1
+    
     for i in range(10):
-        server.send(i, b'abx')
+        server.send(i, b'a'*1000000)
     for i in range(10):
         id, payload = server.recv()
         print(id, i)
