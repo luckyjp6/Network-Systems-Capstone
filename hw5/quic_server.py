@@ -4,6 +4,7 @@ class QUICServer:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.already_recv = []
         self.pn = 0
         
     def listen(self, socket_addr: tuple[str, int]):
@@ -22,8 +23,13 @@ class QUICServer:
     def recv(self) -> tuple[int, bytes]: # stream_id, data
         global recv_streams, recv_lock
         done_stream = -1
-        while done_stream < 0: done_stream = check_done()
-
+        while done_stream < 0: 
+            done_stream = check_done()
+            if done_stream in self.already_recv: 
+                recv_streams.pop(done_stream)
+                done_stream = -1
+        
+        self.already_recv.append(done_stream)
         recv_lock.acquire()
         payload = recv_streams[done_stream].get_data()
         recv_streams.pop(done_stream)
@@ -47,9 +53,9 @@ if __name__ == "__main__":
     server.listen(("127.0.0.1", 30000))
     server.accept()
     
-    for i in range(10):
+    for i in range(1):
         server.send(i, b'a'*1000000)
-    for i in range(10):
+    for i in range(1):
         id, payload = server.recv()
         print(id, i)
 
