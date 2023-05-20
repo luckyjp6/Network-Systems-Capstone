@@ -3,11 +3,23 @@ import os
 import glob
 import xml.etree.ElementTree as ET
 
-class HTTPClient():
-    def __init__(self) -> None:
-        pass
-        
-    def __send_request(self, s:socket.socket, request):
+class HTTPClient:
+    def __init__(self, host="127.0.0.1", port=8080) -> None:
+        self.connecting = False
+        self.host=host
+        self.port=port
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(5)
+    
+    def __send_request(self, request):
+        if not self.connecting:
+            try:
+                self.socket.connect((self.host, self.port))
+                self.connecting = True
+            except:
+                print("connection fail")
+                return None
+
         request_str = f"{request['method']} {request['resource']} {request['version']}\r\n"
 
         for key, value in request['headers'].items():
@@ -15,59 +27,57 @@ class HTTPClient():
         request_str += "\r\n"
         request_str += request['body']
 
-        s.sendall(request_str.encode())
+        try:
+            print(request_str)
+            self.socket.sendall(request_str.encode())
+        except:
+            print("send all fail")
+            self.connecting = False
+            self.socket.close()
+            return None
         
+        return 0
+
     def get(self, url, headers=None, stream=False):
         request = {
-            'version': 'HTTP/1.0', 
+            'version': 'HTTP/1.1', 
             'method':'GET', 
             'scheme':'http',
             'headers': {'Content-Type': 'text/html'},
             'body': ""
         }
         url = url.replace("http://", "")
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.settimeout(5)
         host = url.find(":")
         path = url.find("/")
-        port = "8080"
-        if host >= 0: port = url[host+1:path]
-        else: host = path
-        host = url[0:host]
-        request['authority'] = f"{host}:{port}"
+        self.port = url[host+1:path]
+        self.host = url[0:host]
+        request['authority'] = f"{self.host}:{self.port}"
+        self.port = int(self.port)
         request['resource'] = url[path:]
         request['path'] = url[path:]
         request['body'] = ""
 
-        # print(f"host: {host}, port: {port}, path: {path}")
-
-        try: self.s.connect((host, int(port)))
-        except: 
-            print("connec fail")
-            return None
-        try:
-            self.__send_request(self.s, request)
-        except:
-            print("sendall fail")
-            self.s.close()
+        if self.__send_request(request) == None:
+            print("is none")
+            self.connecting = False
+            self.socket.close()  
             return None
         
         # receive response
-        response = Response(self.s, stream)
+        response = Response(self.socket, stream)
 
-        # get header 
         recv_header = b''
         nextline_count = 0
         while True:
-            b = self.s.recv(1)
+            b = self.socket.recv(1)
             recv_header += b
             if b == b'\r': 
-                b = self.s.recv(1)
+                b = self.socket.recv(1)
                 recv_header += b
                 if b == b'\n': nextline_count += 1
             else: nextline_count = 0
             if nextline_count == 2: break
-            
+        
         resp_parse = parse_response(recv_header.decode())
         response.version = resp_parse['version']
         response.status = resp_parse['status']
@@ -79,7 +89,7 @@ class HTTPClient():
                 response.get_remain_body()
 
         return response
-    
+
 class Response():
     def __init__(self, socket:socket.socket, stream) -> None:
         self.socket = socket
@@ -114,10 +124,9 @@ class Response():
 
         if self.recv_len >= self.body_length: 
             self.complete = True
-            self.socket.close()
         
         return recv_bytes
-
+    
 def parse_response(response_str):
     response = {
         'version': "", # e.g. "HTTP/1.0"
@@ -164,8 +173,8 @@ def parse_response(response_str):
 if __name__ == '__main__':
     client = HTTPClient()
 
-    target_path = "../../target"
-    response = client.get(url=f"127.0.0.1:8080/")
+    target_path = "./tutorials/target"
+    response = client.get(url=f"http://127.0.0.1:8080/")
     file_list = []
     if response and response.headers['content-type'] == 'text/html':
         root = ET.fromstring(response.body.decode())
@@ -191,45 +200,3 @@ if __name__ == '__main__':
             print(f"{file_path} end")
         else:
             print("no response")
-    # Send an HTTP GET request to the server
-    # request = "GET /get?id=123 HTTP/1.0\r\n\r\n"
-    # response = send_reqeuest(request)
-    # print(response)
-    # headers = response['headers']
-    # body = response['body']
-
-    # if 'content-type' in headers and headers['content-type'] == 'application/json':
-    #     try:
-    #         data = json.loads(body)
-    #         if 'id' in data and 'key' in data:
-    #             print(f"Get id={data['id']} key={data['key']}")
-    #         else:
-    #             data = None
-    #     except:
-    #         data = None
-    # else:
-    #     data = None
-    
-    # if data is None:
-    #     print('Get failed')
-    #     exit()
-
-    # # Send an HTTP POST request to the server
-    # request = f"POST /post HTTP/1.0\r\nContent-Type: application/json\r\n\r\n{json.dumps(data)}"
-    # response = send_reqeuest(request)
-    # print(response)
-    # headers = response['headers']
-    # body = response['body']
-    # if 'content-type' in headers and headers['content-type'] == 'application/json':
-    #     try:
-    #         data = json.loads(body)
-    #         if 'success' in data:
-    #             print(f"Post success={data['success']}")
-    #         else:
-    #             data = None
-    #     except:
-    #         data = None
-    # else:
-    #     data = None
-    # if not data:
-    #     print('Post failed')
