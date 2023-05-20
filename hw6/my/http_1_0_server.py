@@ -63,14 +63,13 @@ class ClientHandler():
             response['status'] = "200 OK"
             response['headers'] = {'Content-Type': 'text/html', 'Content-Length':file_size}
             
-            content = file.read(3000)
-            response['body'] = content
-            self.__send_response(request, response)
-
             while True:
                 content = file.read(3000)
                 if len(content) == 0: break
-                self.client.sendall(content.encode())
+                response['body'] = content
+                if 'headers' in response: self.__send_response(request, response)
+                else: self.client.sendall(content.encode())
+                response.clear()
             file.close()
             return
 

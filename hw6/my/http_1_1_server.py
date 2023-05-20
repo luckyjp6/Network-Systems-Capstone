@@ -2,7 +2,6 @@ import socket
 import os
 import threading
 from datetime import datetime
-import json
 
 class ClientHandler():
     def __init__(self, client, address, static_path) -> None:
@@ -64,7 +63,9 @@ class ClientHandler():
                     content = file.read(3000)
                     if len(content) == 0: break
                     response['body'] = content
-                    self.__send_response(request, response)
+                    if 'headers' in response: self.__send_response(request, response)
+                    else: self.client.sendall(content.encode())
+                    response.clear()
                 file.close()
                 return
             except:
@@ -72,32 +73,32 @@ class ClientHandler():
                 file.close()
                 return
 
-    def __do_post(self, request):
-        path = request['path']
-        headers = request['headers']
-        response = self.__not_found_response()
-        if path == "/post":
-            if 'content-type' in headers and headers['content-type'] == 'application/json':
-                try:
-                    post_data = json.loads(request['body'])
-                except:
-                    post_data = None
-            else:
-                post_data = None
-            if post_data:
-                if 'id' in post_data and 'key' in post_data and post_data['key'] ==  self.key:
-                    response['status'] = "200 OK"
-                    response["headers"] = {'Content-Type': 'application/json'}
-                    response['body'] = json.dumps({'success':True})
-                    print(post_data['id'], "success")
-                else:
-                    response['status'] = "200 OK"
-                    response["headers"] = {'Content-Type': 'application/json'}
-                    response['body'] = json.dumps({'success':False})
-                    print(post_data['id'], "fail")
-            else:
-                response = self.__bad_request_response()
-        self.__send_response(request, response)
+    # def __do_post(self, request):
+    #     path = request['path']
+    #     headers = request['headers']
+    #     response = self.__not_found_response()
+    #     if path == "/post":
+    #         if 'content-type' in headers and headers['content-type'] == 'application/json':
+    #             try:
+    #                 post_data = json.loads(request['body'])
+    #             except:
+    #                 post_data = None
+    #         else:
+    #             post_data = None
+    #         if post_data:
+    #             if 'id' in post_data and 'key' in post_data and post_data['key'] ==  self.key:
+    #                 response['status'] = "200 OK"
+    #                 response["headers"] = {'Content-Type': 'application/json'}
+    #                 response['body'] = json.dumps({'success':True})
+    #                 print(post_data['id'], "success")
+    #             else:
+    #                 response['status'] = "200 OK"
+    #                 response["headers"] = {'Content-Type': 'application/json'}
+    #                 response['body'] = json.dumps({'success':False})
+    #                 print(post_data['id'], "fail")
+    #         else:
+    #             response = self.__bad_request_response()
+    #     self.__send_response(request, response)
 
     def __send_response(self, request, response):
         response_str = f"{response['version']} {response['status']}\r\n"
