@@ -9,7 +9,7 @@ class HTTPClient:
         self.connecting = False
     def get(self, url, headers=None):
         request = {
-            'version': 'HTTP/1.1', 
+            'version': 'HTTP/2.0', 
             
             'headers': {':method':'GET', ':scheme':'http', 'Content-Type': 'text/html'},
         }
@@ -36,7 +36,7 @@ class HTTPClient:
         self.next_stream_id += 2
         return stream_id
     
-    def connect(self, host="10.0.1.1", port=8080):
+    def connect(self, host="127.0.0.1", port=8080):
         if not self.connecting:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.settimeout(5)
@@ -55,37 +55,11 @@ class HTTPClient:
             except:
                 self.connecting = False
                 self.socket.close()
+                print("####cannot connect")
 
     def __complete_stream(self, stream_id):
         if stream_id in self.recv_streams:
             self.recv_streams[stream_id].complete = True
-
-    # def wait_for_response(self, stream_id):
-    #     response = {
-    #         'version': "HTTP/2.0", # e.g. "HTTP/1.0"
-    #         'status': "", # e.g. "200 OK"
-    #         'headers': {}, # e.g. {content-type: application/json}
-    #         'body': ""  # e.g. "{'id': params['id'], 'key': hmac_sha256(params['id'], 'http10')}"
-    #     }
-    #     wait_count = 0
-    #     while self.connecting:
-    #         if wait_count > 300:
-    #             return None
-    #         if stream_id not in self.recv_streams:
-    #             return None
-    #         if self.recv_streams[stream_id].complete:
-    #             try:
-    #                 response['headers'] = self.recv_streams[stream_id]['headers']
-    #                 response['body'] = self.recv_streams[stream_id]['body'].decode('utf-8')
-    #                 response['status'] = response['headers'][':status']
-    #             except:
-    #                 return None
-    #             del self.recv_streams[stream_id]
-    #             return response
-    #         wait_count += 1
-    #         time.sleep(0.01)
-    #     del self.recv_streams[stream_id]
-    #     return None
 
     def __send_loop(self):
         while self.connecting:

@@ -1,5 +1,6 @@
 import socket
 import os
+import io
 import threading
 from datetime import datetime
 
@@ -55,7 +56,7 @@ class ClientHandler():
             file_name = self.static_path + path[7:]
             try:
                 file_size = os.path.getsize(file_name)
-                file = open(file_name, "r")
+                file = io.open(file_name, "r", newline='')
                 response['status'] = "200 OK"
                 response['headers'] = {'Content-Type': 'text/html', 'Content-Length':file_size}
                 

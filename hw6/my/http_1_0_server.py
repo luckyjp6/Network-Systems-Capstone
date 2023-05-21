@@ -1,5 +1,6 @@
 import socket
 import threading
+import io
 import os
 from datetime import datetime
 
@@ -55,7 +56,8 @@ class ClientHandler():
             file_name = self.static_path + path[7:]
             try:
                 file_size = os.path.getsize(file_name)
-                file = open(file_name, "r")
+                print(f"file size: {file_size}")
+                file = io.open(file_name, "r", newline='')
             except:
                 print(f"open {file_name} fail")
                 file.close()
@@ -65,6 +67,8 @@ class ClientHandler():
             
             while True:
                 content = file.read(3000)
+                print(content.encode())
+                print(len(content))
                 if len(content) == 0: break
                 response['body'] = content
                 if 'headers' in response: self.__send_response(request, response)

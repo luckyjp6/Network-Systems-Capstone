@@ -1,3 +1,4 @@
+import io
 import os
 import socket
 import threading
@@ -64,14 +65,13 @@ class ClientHandler():
             # print(f"request {file_name}")
             try:
                 file_size = os.path.getsize(file_name)
-                file = open(file_name, "r")
+                file = io.open(file_name, "r", newline='')
                 response['status'] = "200 OK"
                 response['headers'] = {'Content-Type': 'text/html', 'Content-Length':file_size}
                 
                 while True:
                     content = file.read(3000)
                     file_size -= len(content)
-                    print(file_size)
                     response['body'] = content
                     self.__send_response(request, response, file_size == 0)
                     if file_size <= 0: break
