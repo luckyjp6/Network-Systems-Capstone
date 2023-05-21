@@ -376,21 +376,18 @@ class HTTPClient:
         while self.connecting:
             try:
                 stream_id, recv_bytes, complete = self.socket.recv()
-                # print(stream_id, recv_bytes)
                 if not stream_id:
                     self.connecting = False
                     self.socket.close()
                     break
                 # parse response
                 response = parse_response(recv_bytes.decode())
-                # print(response['headers'])
                 self.recv_streams[stream_id].status = response['status']
                 if 'headers' in response: self.recv_streams[stream_id].headers = response['headers']
                 self.recv_streams[stream_id].total_len = int(response['headers']['content-length'])
                 self.recv_streams[stream_id].recv_len += len(response['body'])
                 self.recv_streams[stream_id].contents.append(response['body'].encode())
-                self.recv_streams[stream_id].complete = complete#(self.recv_streams[stream_id].recv_len >= self.recv_streams[stream_id].total_len)
-                if complete: print(f"stream {stream_id} complete")
+                self.recv_streams[stream_id].complete = complete
             except:
                 self.connecting=False
                 self.socket.close()
@@ -409,10 +406,8 @@ class HTTPClient:
         
         if 'body' in request: data += f"\r\n{request['body']}"
 
-        # print("send request:", request)
-        # print("send data:", data)
         self.socket.send(stream_id, data.encode())
-        self.recv_streams[stream_id] = Response(stream_id) #{'complete': False, 'request': request, 'response': {}}
+        self.recv_streams[stream_id] = Response(stream_id)
         return stream_id
         
     def close(self):
@@ -452,7 +447,7 @@ class Response():
     def get_stream_content(self): # used for handling long body
         begin_time = time.time()
         while len(self.contents) == 0: # contents is a buffer, busy waiting for new content
-            # print(len(self.contents))
+            
             if time.time()-begin_time > 5: # if response is complete or timeout
                 return None
             if self.complete and len(self.contents) == 0: 
@@ -574,7 +569,6 @@ class QUICClient:
                 pkt.frame.length = len(pkt.frame.stream_data)
                 b = pkt.serialize()
                 self.send_wait_list.append((pkt.header.pkt_num, b, 0.0))
-                # print(b)
 
                 i += 1400
                 
@@ -656,7 +650,6 @@ class QUICClient:
                     continue
                 else:
                     self.recv_stream_offsets[id].append(pkt.frame.offset)
-                    print(f"recv {len(pkt.frame.stream_data)}")
 
                 # reordering
                 if len(self.recv_window[id]) == now_pos:

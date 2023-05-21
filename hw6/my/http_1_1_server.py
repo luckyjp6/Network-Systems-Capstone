@@ -144,7 +144,6 @@ class ClientHandler():
                 # keep connection: don't close socket
 
             except:
-                print("stop recv loop")
                 self.close()
                 break
 

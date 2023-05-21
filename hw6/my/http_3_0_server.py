@@ -215,7 +215,7 @@ class HTTPServer():
     def __init__(self, host="127.0.0.1", port=8080) -> None:
         # Create a socket object
         self.socket = QUICServer(host, port)
-        # self.socket.drop(3)
+        self.socket.drop(5)
         self.host = host
         self.port = port
         self.handler = None
@@ -237,7 +237,7 @@ class HTTPServer():
                 if self.handler and not self.handler.alive:
                     self.handler = None
                     self.socket = QUICServer(self.host, self.port)
-                    # self.socket.drop(3)
+                    self.socket.drop(5)
                 time.sleep(0.01)
 
             except:
@@ -618,6 +618,7 @@ class QUICServer:
         if type(stream_id) == list and type(data) == list:
             stream_id_data = {}
             for i, id in enumerate(stream_id):
+                if id in self.drop_id: continue
                 ptr = 0
                 stream_id_data[id] = []
                 while ptr <= len(data[i]):
@@ -642,6 +643,7 @@ class QUICServer:
 
                     
         elif type(stream_id) == int and type(data) == bytes:
+            if stream_id in self.drop_id: return
             if stream_id not in self.send_offsets.keys():
                 self.send_offsets[stream_id] = 0
             i = 0

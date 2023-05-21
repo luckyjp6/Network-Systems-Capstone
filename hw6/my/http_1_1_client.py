@@ -28,7 +28,6 @@ class HTTPClient:
         request_str += request['body']
 
         try:
-            print(request_str)
             self.socket.sendall(request_str.encode())
         except:
             print("send all fail")
