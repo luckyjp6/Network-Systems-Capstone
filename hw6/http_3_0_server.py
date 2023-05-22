@@ -219,7 +219,7 @@ class HTTPServer():
     def __init__(self, host="127.0.0.1", port=8080) -> None:
         # Create a socket object
         self.socket = QUICServer(host, port)
-        # self.socket.drop(5)
+        self.socket.drop(5)
         self.host = host
         self.port = port
         self.handler = None
@@ -241,7 +241,7 @@ class HTTPServer():
                 if self.handler and not self.handler.alive:
                     self.handler = None
                     self.socket = QUICServer(self.host, self.port)
-                    # self.socket.drop(5)
+                    self.socket.drop(5)
                 time.sleep(0.01)
 
             except:
@@ -830,7 +830,7 @@ class QUICServer:
 
 if __name__ == '__main__':
     server = HTTPServer()
-    server.set_static("../../static")
+    server.set_static("./tutorials/static")
     server.run()
 
     while True:
