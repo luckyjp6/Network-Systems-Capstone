@@ -1,5 +1,8 @@
 import socket
+import os
+import glob
 import threading
+import xml.etree.ElementTree as ET
 import time
 import struct
 from collections import deque
@@ -109,7 +112,7 @@ class HTTPClient:
                         
 
                     if self.recv_streams[frame.stream_id].check_complete(): 
-                        # print(f"complete {frame.stream_id}, data: {self.recv_streams[frame.stream_id].headers}")
+                        print(f"complete {frame.stream_id}, data: {self.recv_streams[frame.stream_id].headers}")
                         self.__complete_stream(frame.stream_id)
             except:
                 self.connecting=False
@@ -271,31 +274,44 @@ def bytes_to_frames(data):
 #     else:
 #         print("no response")
 
+def write_file_from_response(file_path, response):
+    if response:
+        print(f"{file_path} begin")
+        with open(file_path, "wb") as f:
+            while True:
+                content = response.get_stream_content()
+                if content is None: break
+                # print("get", len(content))
+                f.write(content)
+        print(f"{file_path} end")
+    else:
+        print("no response")
+        
 if __name__ == '__main__':
     client = HTTPClient()
 
-    # target_path = "./tutorials/target"
-    # response = client.get(url=f"127.0.0.1:8080/")
-    # file_list = []
-    # if response:
-    #     headers = response.get_headers()
-    #     if headers['content-type'] == 'text/html':
-    #         body = response.get_full_body()
-    #         root = ET.fromstring(body.decode())
-    #         links = root.findall('.//a')
-    #         file_list = []
-    #         for link in links:
-    #             file_list.append(link.text)
+    target_path = "./tutorials/target"
+    response = client.get(url=f"127.0.0.1:8080/")
+    file_list = []
+    if response:
+        headers = response.get_headers()
+        if headers['content-type'] == 'text/html':
+            body = response.get_full_body()
+            root = ET.fromstring(body.decode())
+            links = root.findall('.//a')
+            file_list = []
+            for link in links:
+                file_list.append(link.text)
 
-    # for file in glob.glob(os.path.join(target_path, '*.txt')):
-    #     os.remove(file)
+    for file in glob.glob(os.path.join(target_path, '*.txt')):
+        os.remove(file)
 
-    # th_list = []
-    # for file in file_list:
-    #     response = client.get(f"127.0.0.1:8080/static/{file}")
-    #     th = threading.Thread(target=write_file_from_response, args=[f"{target_path}/{file}", response])
-    #     th_list.append(th)
-    #     th.start()
+    th_list = []
+    for file in file_list:
+        response = client.get(f"127.0.0.1:8080/static/{file}")
+        th = threading.Thread(target=write_file_from_response, args=[f"{target_path}/{file}", response])
+        th_list.append(th)
+        th.start()
         
-    # for th in th_list:
-    #     th.join()
+    for th in th_list:
+        th.join()

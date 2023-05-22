@@ -45,9 +45,9 @@ class ClientHandler():
                                     <body> \
                                         <a href=\"/static/file_00.txt\">file_00.txt</a> \
                                         <br/> \
-                                        <a href=\"/static/file_02.txt\">file_02.txt</a> \
-                                        <br/> \
                                         <a href=\"/static/file_01.txt\">file_01.txt</a> \
+                                        <br/> \
+                                        <a href=\"/static/file_02.txt\">file_02.txt</a> \
                                     </body> \
                                 </html>"
             self.__send_response(request, response)

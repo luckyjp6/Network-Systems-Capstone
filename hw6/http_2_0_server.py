@@ -3,6 +3,7 @@ import os
 import socket
 import threading
 import struct
+import time
 from datetime import datetime
 
 class ClientHandler():
@@ -15,6 +16,8 @@ class ClientHandler():
         self.recv_streams = {}
         self.send_buffers = {}
         self.static_path = static_path
+
+        self.send_count = 0
 
         # self.key = hmac_sha256(f'key{random.random()*100}', 'http11')
         self.recv_thread = threading.Thread(target=self.__recv_loop)
@@ -53,9 +56,9 @@ class ClientHandler():
                                     <body> \
                                         <a href=\"/static/file_00.txt\">file_00.txt</a> \
                                         <br/> \
-                                        <a href=\"/static/file_02.txt\">file_02.txt</a> \
-                                        <br/> \
                                         <a href=\"/static/file_01.txt\">file_01.txt</a> \
+                                        <br/> \
+                                        <a href=\"/static/file_02.txt\">file_02.txt</a> \
                                     </body> \
                                 </html>"
             self.__send_response(request, response, True)
@@ -73,8 +76,8 @@ class ClientHandler():
                     content = file.read(3000)
                     file_size -= len(content)
                     response['body'] = content
-                    self.__send_response(request, response, file_size == 0)
-                    if file_size <= 0: break
+                    self.__send_response(request, response, (file_size == 0))
+                    if file_size == 0: break
                 file.close()
                 return
             except:
@@ -113,6 +116,7 @@ class ClientHandler():
         response['headers'][':status'] = response['status']
         stream_id = request['stream_id']
         self.__send_headers(stream_id, response['headers'])
+
         self.__send_body(stream_id, response['body'].encode(), complete)
 
         # Log
@@ -124,6 +128,8 @@ class ClientHandler():
         for key, value in headers.items():
             hdr += f"{key}: {value}\r\n"
         frame = create_headers_frame(stream_id, hdr.encode(), end_stream)
+        if stream_id in self.send_buffers:
+            while len(self.send_buffers[stream_id]) > 0: continue
         self.send_buffers[stream_id] = [frame]
 
     def __send_body(self, stream_id, body, complete):
@@ -165,9 +171,10 @@ class ClientHandler():
         
     def __send_loop(self):
         while self.alive:
+            end_streams = []
             try:
-                end_streams = []
                 keys = list(self.send_buffers.keys())
+                # if self.send_buffers: print(self.send_buffers)
                 for key in keys:
                     if len(self.send_buffers[key]) > 0:
                         frame = self.send_buffers[key].pop(0)
@@ -189,6 +196,7 @@ class ClientHandler():
 
                 # check connection
                 if not recv_bytes:
+                    print("client close connection")
                     self.alive = False
                     self.client.close()
                     break
@@ -225,6 +233,7 @@ class HTTPServer():
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Bind the socket to a specific address and port
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((host, port))
         
         # Listen for incoming connections
@@ -253,7 +262,6 @@ class HTTPServer():
                 # catch socket closed
                 self.alive = False
                 pass
-
 
     def run(self):
         if not self.alive:
