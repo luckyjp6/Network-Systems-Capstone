@@ -830,7 +830,7 @@ class QUICServer:
 
 if __name__ == '__main__':
     server = HTTPServer()
-    server.set_static("./tutorials/static")
+    server.set_static("../../static")
     server.run()
 
     while True:

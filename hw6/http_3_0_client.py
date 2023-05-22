@@ -771,7 +771,7 @@ def write_file_from_response(file_path, response):
 if __name__ == '__main__':
     client = HTTPClient()
 
-    target_path = "./tutorials/target"
+    target_path = "../../target"
     response = client.get(url=f"http://127.0.0.1:8080/")
     file_list = []
     if response:

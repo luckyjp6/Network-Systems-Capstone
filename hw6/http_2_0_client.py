@@ -206,7 +206,7 @@ class Response():
     def get_stream_content(self): # used for handling long body
         begin_time = time.time()
         while len(self.contents) == 0: # contents is a buffer, busy waiting for new content
-            if self.complete or time.time()-begin_time > 5: # if response is complete or timeout
+            if self.complete or time.time()-begin_time > 30: # if response is complete or timeout
                 return None
         content = self.contents.popleft() # pop content from deque
         return content # the part content of the HTTP response body
@@ -289,7 +289,8 @@ def write_file_from_response(file_path, response):
 if __name__ == '__main__':
     client = HTTPClient()
 
-    target_path = "./tutorials/target"
+    target_path = "../../target"
+    # target_path = "./tutorials/target"
     response = client.get(url=f"127.0.0.1:8080/")
     file_list = []
     if response:

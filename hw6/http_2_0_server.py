@@ -368,7 +368,7 @@ def bytes_to_frames(data):
 
 if __name__ == '__main__':
     server = HTTPServer()
-    server.set_static("./tutorials/static")
+    server.set_static("../../static")
     server.run()
 
     while True:
