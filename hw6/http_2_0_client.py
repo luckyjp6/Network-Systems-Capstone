@@ -110,9 +110,9 @@ class HTTPClient:
                         self.recv_streams[frame.stream_id].status = headers[':status']
                         self.recv_streams[frame.stream_id].total_len = int(headers['content-length'])
                         
-
                     if self.recv_streams[frame.stream_id].check_complete(): 
-                        self.__complete_stream(frame.stream_id)
+                        if frame.stream_id in self.recv_streams:
+                            self.recv_streams[frame.stream_id].complete = True
             except:
                 self.connecting=False
                 self.socket.close()
@@ -184,7 +184,7 @@ class Response():
         self.complete = False
     
     def check_complete(self) -> bool:
-        return self.recv_len >= self.total_len
+        return self.recv_len == self.total_len
 
     def get_headers(self):
         begin_time = time.time()
@@ -206,7 +206,8 @@ class Response():
     def get_stream_content(self): # used for handling long body
         begin_time = time.time()
         while len(self.contents) == 0: # contents is a buffer, busy waiting for new content
-            if self.complete or time.time()-begin_time > 30: # if response is complete or timeout
+            if self.complete and len(self.contents) == 0: # or time.time()-begin_time > 30: # if response is complete or timeout
+                # print(self.recv_len, self.total_len)
                 return None
         content = self.contents.popleft() # pop content from deque
         return content # the part content of the HTTP response body
@@ -274,14 +275,16 @@ def bytes_to_frames(data):
 #         print("no response")
 
 def write_file_from_response(file_path, response):
+    # c = 0
     if response:
         print(f"{file_path} begin")
         with open(file_path, "wb") as f:
             while True:
                 content = response.get_stream_content()
                 if content is None: break
-                # print("get", len(content))
+                # c += len(content)
                 f.write(content)
+        # print(c)
         print(f"{file_path} end")
     else:
         print("no response")
@@ -289,8 +292,8 @@ def write_file_from_response(file_path, response):
 if __name__ == '__main__':
     client = HTTPClient()
 
-    target_path = "../../target"
-    # target_path = "./tutorials/target"
+    # target_path = "../../target"
+    target_path = "./tutorials/target"
     response = client.get(url=f"127.0.0.1:8080/")
     file_list = []
     if response:
