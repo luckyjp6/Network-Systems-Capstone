@@ -165,7 +165,7 @@ if __name__ == '__main__':
     client = HTTPClient()
 
     target_path = "../../target"
-    response = client.get(url=f"127.0.0.1:8080/")
+    response = client.get(url=f"http://127.0.0.1:8080/")
     file_list = []
     if response and response.headers['content-type'] == 'text/html':
         root = ET.fromstring(response.body.decode())
@@ -176,6 +176,7 @@ if __name__ == '__main__':
 
     for file in glob.glob(os.path.join(target_path, '*.txt')):
         os.remove(file)
+    
 
     for file in file_list:
         response = client.get(f"127.0.0.1:8080/static/{file}", stream=True)
@@ -191,45 +192,3 @@ if __name__ == '__main__':
             print(f"{file_path} end")
         else:
             print("no response")
-    # Send an HTTP GET request to the server
-    # request = "GET /get?id=123 HTTP/1.0\r\n\r\n"
-    # response = send_reqeuest(request)
-    # print(response)
-    # headers = response['headers']
-    # body = response['body']
-
-    # if 'content-type' in headers and headers['content-type'] == 'application/json':
-    #     try:
-    #         data = json.loads(body)
-    #         if 'id' in data and 'key' in data:
-    #             print(f"Get id={data['id']} key={data['key']}")
-    #         else:
-    #             data = None
-    #     except:
-    #         data = None
-    # else:
-    #     data = None
-    
-    # if data is None:
-    #     print('Get failed')
-    #     exit()
-
-    # # Send an HTTP POST request to the server
-    # request = f"POST /post HTTP/1.0\r\nContent-Type: application/json\r\n\r\n{json.dumps(data)}"
-    # response = send_reqeuest(request)
-    # print(response)
-    # headers = response['headers']
-    # body = response['body']
-    # if 'content-type' in headers and headers['content-type'] == 'application/json':
-    #     try:
-    #         data = json.loads(body)
-    #         if 'success' in data:
-    #             print(f"Post success={data['success']}")
-    #         else:
-    #             data = None
-    #     except:
-    #         data = None
-    # else:
-    #     data = None
-    # if not data:
-    #     print('Post failed')

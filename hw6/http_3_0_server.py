@@ -60,9 +60,9 @@ class ClientHandler():
                                     <body> \
                                         <a href=\"/static/file_00.txt\">file_00.txt</a> \
                                         <br/> \
-                                        <a href=\"/static/file_02.txt\">file_02.txt</a> \
-                                        <br/> \
                                         <a href=\"/static/file_01.txt\">file_01.txt</a> \
+                                        <br/> \
+                                        <a href=\"/static/file_02.txt\">file_02.txt</a> \
                                     </body> \
                                 </html>"
             self.__send_response(request, response, True)
@@ -70,24 +70,25 @@ class ClientHandler():
         elif path[:7] == "/static": # get file from directory "/static"
             file_name = self.static_path + path[7:]
             # print(f"request {file_name}")
-            try:
-                file_size = os.path.getsize(file_name)
-                file = io.open(file_name, "r", newline='')
-                response['status'] = "200 OK"
-                response['headers'] = {'Content-Type': 'text/html', 'Content-Length':file_size}
-                
-                while True:
-                    content = file.read(1000)
-                    file_size -= len(content)
-                    response['body'] = content
-                    self.__send_response(request, response, file_size == 0)
-                    if file_size <= 0: break
-                file.close()
-                return
-            except:
-                print(f"open {file_name} fail")
-                file.close()
-                return
+            # try:
+            file_size = os.path.getsize(file_name)
+            file = io.open(file_name, "r", newline='')
+            response['status'] = "200 OK"
+            response['headers'] = {'Content-Type': 'text/html', 'Content-Length':file_size}
+            
+            while True:
+                content = file.read(3000)
+                file_size -= len(content)
+                response['body'] = content
+                self.__send_response(request, response, file_size == 0)
+                if file_size == 0: break
+                response.clear()
+            file.close()
+            return
+            # except:
+            #     print(f"open {file_name} fail")
+            #     file.close()
+            #     return
 
     # def __do_post(self, request):
     #     path = request['path']
@@ -119,23 +120,25 @@ class ClientHandler():
 
     def __send_response(self, request, response, complete):
         stream_id = request['stream_id']
-        response_str = f"{response['version']} {response['status']}\r\n"
+        response_str = ""
+        if 'headers' in response:
+            response_str += f"{response['version']} {response['status']}\r\n"
+            for key in response['headers']:
+                response_str += f"{key}: {response['headers'][key]}\r\n"
+            if 'body' in response: response_str += "\r\n"
 
-        for key in response['headers']:
-            response_str += f"{key}: {response['headers'][key]}\r\n"
-        response_str += f"\r\n{response['body']}"
+        response_str += f"{response['body']}"
 
         self.client.send(stream_id, response_str.encode(), end=complete)
 
         # Log
-        print(f"{self.address[0]} - - {datetime.now().strftime('%d/%m/%y %H:%M:%S')} \"{request['method']} {request['path']} {request['version']}\" {response['status']} -")
+        print(f"{self.address[0]} - - {datetime.now().strftime('%d/%m/%y %H:%M:%S')} \"{request['method']} {request['path']} {request['version']}\"")
 
     def __recv_loop(self):
         while self.alive:
             try:
                 # Recv request
                 stream_id, recv_bytes, complete = self.client.recv()
-                # print(stream_id, recv_bytes)
 
                 # check connection
                 if not stream_id:
@@ -160,6 +163,7 @@ class ClientHandler():
                 # keep connection: don't close socket
 
             except:
+                print("recv except")
                 self.alive = False
                 self.client.close()
                 break
@@ -215,7 +219,7 @@ class HTTPServer():
     def __init__(self, host="127.0.0.1", port=8080) -> None:
         # Create a socket object
         self.socket = QUICServer(host, port)
-        self.socket.drop(5)
+        # self.socket.drop(5)
         self.host = host
         self.port = port
         self.handler = None
@@ -237,7 +241,7 @@ class HTTPServer():
                 if self.handler and not self.handler.alive:
                     self.handler = None
                     self.socket = QUICServer(self.host, self.port)
-                    self.socket.drop(5)
+                    # self.socket.drop(5)
                 time.sleep(0.01)
 
             except:
@@ -640,14 +644,13 @@ class QUICServer:
                         pkt.frame.length = len(pkt.frame.stream_data)
                         b = pkt.serialize()
                         self.send_wait_list.append((pkt.header.pkt_num, b, 0.0))
-
-                    
+           
         elif type(stream_id) == int and type(data) == bytes:
             if stream_id in self.drop_id: return
             if stream_id not in self.send_offsets.keys():
                 self.send_offsets[stream_id] = 0
             i = 0
-            while i <= len(data):
+            while i < len(data):
                 pkt.clear()
                 pkt.header.header_form = 0
                 pkt.header.pkt_num = self.pkt_num_inc()
@@ -663,12 +666,12 @@ class QUICServer:
                 b = pkt.serialize()
                 self.send_wait_list.append((pkt.header.pkt_num, b, 0.0))
 
-                
                 i += 1400
                 
             self.send_offsets[stream_id] += i
 
     def send_task(self):
+        # cc = 0
         while self.is_running:
             # move queue packet to sender window to send
             while not self.sender_window.is_full() and len(self.send_wait_list) != 0:

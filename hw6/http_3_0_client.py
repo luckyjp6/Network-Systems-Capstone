@@ -372,6 +372,7 @@ class HTTPClient:
                 self.recv_thread = threading.Thread(target=self.__recv_loop)
                 self.recv_thread.start()
             except:
+                print("connection failed")
                 self.connecting = False
                 self.socket.close()
 
@@ -380,18 +381,21 @@ class HTTPClient:
             try:
                 stream_id, recv_bytes, complete = self.socket.recv()
                 if not stream_id:
+                    # print("recv loop not stream id")
                     self.connecting = False
                     self.socket.close()
                     break
                 # parse response
-                response = parse_response(recv_bytes.decode())
-                self.recv_streams[stream_id].status = response['status']
-                if 'headers' in response: self.recv_streams[stream_id].headers = response['headers']
-                self.recv_streams[stream_id].total_len = int(response['headers']['content-length'])
-                self.recv_streams[stream_id].recv_len += len(response['body'])
-                self.recv_streams[stream_id].contents.append(response['body'].encode())
+                if self.recv_streams[stream_id].status == "Not yet":
+                    response = parse_response(recv_bytes.decode())
+                    self.recv_streams[stream_id].headers = response['headers']
+                    self.recv_streams[stream_id].status = response['status']
+                    self.recv_streams[stream_id].contents.append(response['body'].encode())
+                else:
+                    self.recv_streams[stream_id].contents.append(recv_bytes)
                 self.recv_streams[stream_id].complete = complete
             except:
+                # print("recv loop fail")
                 self.connecting=False
                 self.socket.close()
                 break
@@ -402,7 +406,7 @@ class HTTPClient:
             return None
         stream_id = self.__get_next_stream_id()
         
-        data = f"{request['headers']['method']} {request['headers']['path']} {request['headers']['version']}"
+        data = f"{request['headers']['method']} {request['headers']['path']} {request['headers']['version']}\r\n"
 
         for key, value in request['headers'].items():
             data += f"{key}: {value}\r\n"
@@ -424,9 +428,7 @@ class Response():
         
         self.status = status
         self.body = b""
-        self.recv_len = 0
-        self.total_len = 0
-
+        
         self.contents = deque()
         self.complete = False
         
@@ -450,8 +452,7 @@ class Response():
     def get_stream_content(self): # used for handling long body
         begin_time = time.time()
         while len(self.contents) == 0: # contents is a buffer, busy waiting for new content
-            
-            if time.time()-begin_time > 5: # if response is complete or timeout
+            if time.time()-begin_time > 30: # if response is complete or timeout
                 return None
             if self.complete and len(self.contents) == 0: 
                 return None
@@ -605,10 +606,14 @@ class QUICClient:
     def recv_task(self):
         pkt = Packet()
         reply = Packet()
+        # cc = 0
         while self.is_running:
             try:
                 b, addr = self.sock.recvfrom(1500)
+                # cc += len(b)
+                # print(cc)
             except OSError:
+                # print("os error")
                 self.is_running = False
                 break
             pkt.deserialize(b)
@@ -689,8 +694,10 @@ class QUICClient:
                 self.no_resend_list.append(b)
 
             elif pkt.frame.type == Frame.CONNECTION_CLOSE:
+                print("connection close")
                 self.is_running = False
                 self.sock.close()
+        # print("stop running")
 
     def recv(self):
         # if not self.is_running:
@@ -724,6 +731,7 @@ class QUICClient:
         self.drop_id.append(stream_id)
 
     def close(self):
+        # print("been closed")
         self.is_running = False
         try:
             self.socket.shutdown(0)
@@ -745,6 +753,7 @@ class QUICClient:
         self.pkt_num += 1
         return r
 
+
 def write_file_from_response(file_path, response):
     if response:
         print(f"{file_path} begin")
@@ -763,7 +772,7 @@ if __name__ == '__main__':
     client = HTTPClient()
 
     target_path = "./tutorials/target"
-    response = client.get(url=f"127.0.0.1:8080/")
+    response = client.get(url=f"http://127.0.0.1:8080/")
     file_list = []
     if response:
         headers = response.get_headers()
@@ -790,4 +799,4 @@ if __name__ == '__main__':
         th.start()
         
     for th in th_list:
-        th.join()    
+        th.join()

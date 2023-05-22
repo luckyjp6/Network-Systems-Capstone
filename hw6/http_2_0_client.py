@@ -112,7 +112,6 @@ class HTTPClient:
                         
 
                     if self.recv_streams[frame.stream_id].check_complete(): 
-                        print(f"complete {frame.stream_id}, data: {self.recv_streams[frame.stream_id].headers}")
                         self.__complete_stream(frame.stream_id)
             except:
                 self.connecting=False
