@@ -54,3 +54,41 @@ clear all_hosts (clear all hosts' arp table
 ### Demo
 ![image](https://user-images.githubusercontent.com/96563567/225963628-07993ac7-c6e8-410e-8e14-a54583d48550.png)
 
+***
+
+## Hw3 - Aloha, Slotted Aloha, CSMA, and CSMA/CD
+用python模擬並分析不同情況下Aloha, Alotted Aloha, CSMA和CSMA/CD的channel efficiency。
+
+### Analysis
+- 不同數量的host對channel efficiency的影響![image](https://github.com/luckyjp6/Network-Systems-Capstone/assets/96563567/a5fc8935-1c9c-49c6-809d-97623e7d594f)
+- 調整重新發送封包的最大等待時間(max_colision_wait_time)和Slotted Aloha重送封包的機率(p_resend)對channel efficiency的影響，使整體曲線更加平滑![image](https://github.com/luckyjp6/Network-Systems-Capstone/assets/96563567/1268b30c-4c14-4476-bf91-52046a6a50fa)
+
+***
+
+## Hw4 - RIP & OSPF
+以python分別實作OSPF和RIP。
+
+### Implementation
+- OSPF: 實作一個class處理各個node的行為。self.origin_links儲存最一開始的links cost，即實際連線情形，flood時依據self.origin_links判斷對應node之間是否有實體連線，若有就傳送該node上一輪新拿到的的link table。![image](https://github.com/luckyjp6/Network-Systems-Capstone/assets/96563567/d2cba9d9-9f5f-49c9-b440-77d3ebaf30ab)
+- RIP: 和OSPF使用同樣架構，但只傳送自己的links（即distance vector）。![image](https://github.com/luckyjp6/Network-Systems-Capstone/assets/96563567/407e29dc-74f5-4d3b-b7cd-03c362f82a38)
+
+***
+
+## Hw5 - QUIC
+以python實作QUIC server和client。
+
+## 細節待補
+
+***
+
+## Hw6 - HTTP
+以python實作HTTP1.0, HTTP1.1, HTTP2.0和HTTP3.0的server和client。
+
+## 細節待補
+
+*** 
+
+## Hw7 - SDN
+以python撰寫SDN架構中的topology和controller部分，依據spec要求，在match到特定packet條件時forward packet、drop packet或參考特定table進行處理。
+
+## 細節待補
