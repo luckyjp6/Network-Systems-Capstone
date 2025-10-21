@@ -22,7 +22,7 @@ Homeworks of the course Network Systems Capstone
 ***
 
 ## Hw2 - ARP
-用C++模擬簡易的拓譜架構，並實作ARP protocol，藉由此次作業可以充分了解ARP的運作及各個host/switches處理ARP request的流程
+用 Python 模擬簡易的拓譜架構，並實作ARP protocol，藉由此次作業可以充分了解ARP的運作及各個host/switches處理ARP request的流程
 ![image](https://user-images.githubusercontent.com/96563567/225960836-88101399-192a-46d6-9dc5-fa6bd4de136f.png)
 
 ### Command
